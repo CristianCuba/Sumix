@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-[#121316]">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SUMIX</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/static/js/mains.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter para un look moderno -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body class="h-full bg-[#121316] text-gray-200 flex overflow-hidden">
+
+    <!-- BARRA LATERAL (SIDEBAR) -->
+    <aside
+        class="w-16 md:w-20 bg-[#1a1b1e] border-r border-gray-800 flex flex-col items-center py-4 justify-between h-screen shrink-0 z-40">
+
+        <!-- Logo SX y Menú Superior -->
+        <div class="flex flex-col items-center gap-6 w-full">
+            <!-- Logo SX -->
+            <div
+                class="w-10 h-10 md:w-12 md:h-12 bg-orange-600 rounded-2xl flex items-center justify-center font-black text-white text-lg shadow-lg shadow-orange-600/30">
+                SX
+            </div>
+
+            <!-- Navegación -->
+            <nav class="flex flex-col gap-3 w-full px-2">
+                <!-- Opción 1: Almacenes / Inventario -->
+                <a href="{{ url_for('vista_admin') }}" title="Almacenes"
+                    class="p-3 rounded-2xl flex items-center justify-center transition-all border {{ 'bg-orange-600/10 border-orange-500/30 text-orange-500' if request.endpoint == 'vista_admin' else 'border-transparent text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                </a>
+                <a href="{{ url_for('vista_reporte_cierres') }}" title="Reportes de Cierre" class="flex items-center justify-center p-3 text-gray-400 hover:text-white hover:bg-gray-800/60 rounded-xl transition">
+                    <svg class="w-6 h-6 stroke-[1.5]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                </a>
+                <!-- Opción 2: Cuentas por Pagar -->
+                <a href="{{ url_for('cuentas_por_pagar') }}" title="Cuentas por Pagar"
+                    class="p-3 rounded-2xl flex items-center justify-center transition-all border {{ 'bg-orange-600/10 border-orange-500/30 text-orange-500' if request.endpoint == 'cuentas_por_pagar' else 'border-transparent text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z">
+                        </path>
+                    </svg>
+                </a>
+
+                <!-- Opción 3: Usuarios / Ajustes (Opcional) -->
+                <a href="/admin/usuarios" title="Usuarios"
+                    class="p-3 rounded-2xl flex items-center justify-center transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                    </svg>
+                </a>
+            </nav>
+        </div>
+       <!-- Botón Inferior: Salir -->
+        <a href="{{ url_for('logout') }}" title="Cerrar Sesión"
+        class="p-3 rounded-2xl text-red-400 hover:text-white hover:bg-red-600/20 transition-all border border-transparent hover:border-red-500/30">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+        </svg>
+        </a>
+    </aside>
+
+    <!-- ÁREA DE CONTENIDO PRINCIPAL -->
+    <main class="flex-1 overflow-y-auto h-screen">
+        {% block content %}{% endblock %}
+    </main>
+
+</body>
+
+</html>
