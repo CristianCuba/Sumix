@@ -328,3 +328,11 @@ function cerrarModalDetalleCierre() {
         modal.classList.add('hidden');
     }
 }
+function actualizarNombreArchivo(input) {
+    const label = document.getElementById('file-label-text');
+    if (input.files && input.files[0]) {
+        label.textContent = input.files[0].name;
+    } else {
+        label.textContent = "Seleccionar archivo .db";
+    }
+}

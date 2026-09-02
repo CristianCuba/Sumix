@@ -1,5 +1,6 @@
+import os
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -13,33 +14,75 @@ db = SQLAlchemy(app)
 # MODELOS DE BASE DE DATOS
 # -----------------------------------------------------------------#
 
+class Almacen(db.Model):
+    __tablename__ = 'almacenes'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
+    ubicacion = db.Column(db.String(150), nullable=True)
+    es_area_venta = db.Column(db.Boolean, default=False)
+    
+    # Relación con Stocks
+    stocks = db.relationship('StockAlmacen', backref='almacen', cascade="all, delete-orphan", lazy=True)
+
+
+class Proveedor(db.Model):
+    __tablename__ = 'proveedores'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
+    telefono = db.Column(db.String(30), nullable=True)
+    contacto = db.Column(db.String(100), nullable=True)
+    
+    # NOTA: La relación con Productos se declara dinámicamente en 'Producto'
+    # mediante 'backref=db.backref("productos", lazy=True)'
+
+
+class StockAlmacen(db.Model):
+    __tablename__ = 'stock_almacen'
+    id = db.Column(db.Integer, primary_key=True)
+    # APUNTE: 'productos.id' con 's' porque la tabla se llama 'productos'
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
+    almacen_id = db.Column(db.Integer, db.ForeignKey('almacenes.id'), nullable=False)
+    cantidad = db.Column(db.Float, default=0.0)
+
+
 class Producto(db.Model):
+    __tablename__ = 'productos'
     id = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(50), nullable=True)
     nombre = db.Column(db.String(100), nullable=False)
     unidad_medida = db.Column(db.String(20), default='unidad')
     
-    # Stocks por ubicación
-    stock_almacen1 = db.Column(db.Float, default=0.0)
-    stock_almacen2 = db.Column(db.Float, default=0.0)
-    stock_venta = db.Column(db.Float, default=0.0)
-    
-    # Precios y Proveedor
+    # Precios
     precio_costo = db.Column(db.Float, default=0.0)
     precio_venta = db.Column(db.Float, default=0.0)
-    proveedor = db.Column(db.String(100), nullable=True, default="Sin Proveedor")
+    
+    # Relación con Proveedor (Corregida para evitar choques)
+    proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedores.id'), nullable=True)
+    proveedor = db.relationship('Proveedor', backref=db.backref('productos', lazy=True))
     
     # Cuentas por Pagar
-    estado_pago = db.Column(db.String(20), default="Pagado")  # "Pagado" o "Pendiente"
+    estado_pago = db.Column(db.String(20), default="Pagado")
     monto_pendiente = db.Column(db.Float, default=0.0)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Relación con existencias en almacenes
+    stocks = db.relationship('StockAlmacen', backref='producto', cascade="all, delete-orphan", lazy=True)
+
     @property
     def cantidad_total(self):
-        return self.stock_almacen1 + self.stock_almacen2 + self.stock_venta
+        return sum(s.cantidad for s in self.stocks)
+    
+    @property
+    def stock_venta(self):
+        # Búsqueda optimizada en memoria para no saturar la BD
+        for s in self.stocks:
+            if s.almacen and s.almacen.es_area_venta:
+                return s.cantidad
+        return 0.0
 
 
 class Usuario(db.Model):
+    __tablename__ = 'usuarios'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password = db.Column(db.String(100), nullable=False)
@@ -48,8 +91,9 @@ class Usuario(db.Model):
 
 
 class Movimiento(db.Model):
+    __tablename__ = 'movimientos'
     id = db.Column(db.Integer, primary_key=True)
-    producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
     tipo_movimiento = db.Column(db.String(20), nullable=False) # 'entrada', 'salida', 'traslado'
     concepto = db.Column(db.String(50), nullable=False) # 'Compra', 'Venta', 'Merma', 'Traslado'
     cantidad = db.Column(db.Float, nullable=False)
@@ -57,27 +101,31 @@ class Movimiento(db.Model):
     destino = db.Column(db.String(50), nullable=True)
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class CierreDia(db.Model):
+    __tablename__ = 'cierres_dia'
     id = db.Column(db.Integer, primary_key=True)
     fecha = db.Column(db.DateTime, default=datetime.utcnow)
-    usuario_id = db.Column(db.Integer, db.ForeignKey('usuario.id'), nullable=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
     usuario_nombre = db.Column(db.String(100), nullable=False)
     total_esperado = db.Column(db.Float, default=0.0)
     efectivo_caja = db.Column(db.Float, default=0.0)
     diferencia = db.Column(db.Float, default=0.0)
     detalles = db.relationship('DetalleCierre', backref='cierre', lazy=True)
 
+
 class DetalleCierre(db.Model):
+    __tablename__ = 'detalles_cierre'
     id = db.Column(db.Integer, primary_key=True)
-    cierre_id = db.Column(db.Integer, db.ForeignKey('cierre_dia.id'), nullable=False)
-    producto_id = db.Column(db.Integer, db.ForeignKey('producto.id'), nullable=False)
+    cierre_id = db.Column(db.Integer, db.ForeignKey('cierres_dia.id'), nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
     nombre_producto = db.Column(db.String(100), nullable=False)
     precio_venta = db.Column(db.Float, default=0.0)
     stock_inicial = db.Column(db.Float, default=0.0)
     entradas = db.Column(db.Float, default=0.0)
     stock_final = db.Column(db.Float, default=0.0)
     vendidos = db.Column(db.Float, default=0.0)
-    subtotal = db.Column(db.Float, default=0.0) 
+    subtotal = db.Column(db.Float, default=0.0)
 
 
 # -----------------------------------------------------------------#
@@ -121,6 +169,80 @@ def logout():
 
 
 from sqlalchemy import case
+# -----------------------------------------------------------------#
+# GESTIÓN DE ALMACENES Y PROVEEDORES
+# -----------------------------------------------------------------#
+
+@app.route('/admin/gestion-entidades', methods=['GET'])
+def vista_gestion_entidades():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+        
+    almacenes = Almacen.query.all()
+    proveedores = Proveedor.query.all()
+    return render_template('admin_gestion.html', almacenes=almacenes, proveedores=proveedores)
+
+
+@app.route('/admin/almacen/nuevo', methods=['POST'])
+def guardar_almacen():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    nombre = request.form.get('nombre')
+    ubicacion = request.form.get('ubicacion')
+    es_area_venta = 'es_area_venta' in request.form
+
+    if Almacen.query.filter_by(nombre=nombre).first():
+        flash("Ya existe un almacén con ese nombre.", "error")
+        return redirect(url_for('vista_gestion_entidades'))
+
+    nuevo_almacen = Almacen(nombre=nombre, ubicacion=ubicacion, es_area_venta=es_area_venta)
+    db.session.add(nuevo_almacen)
+    db.session.commit()
+    flash("Almacén registrado con éxito", "info")
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/almacen/eliminar/<int:id>', methods=['POST'])
+def eliminar_almacen(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    almacen = Almacen.query.get_or_404(id)
+    db.session.delete(almacen)
+    db.session.commit()
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/proveedor/nuevo', methods=['POST'])
+def guardar_proveedor():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    nombre = request.form.get('nombre')
+    telefono = request.form.get('telefono')
+    contacto = request.form.get('contacto')
+
+    if Proveedor.query.filter_by(nombre=nombre).first():
+        flash("Ya existe un proveedor con ese nombre.", "error")
+        return redirect(url_for('vista_gestion_entidades'))
+
+    nuevo_proveedor = Proveedor(nombre=nombre, telefono=telefono, contacto=contacto)
+    db.session.add(nuevo_proveedor)
+    db.session.commit()
+    flash("Proveedor registrado con éxito", "info")
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/proveedor/eliminar/<int:id>', methods=['POST'])
+def eliminar_proveedor(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    proveedor = Proveedor.query.get_or_404(id)
+    db.session.delete(proveedor)
+    db.session.commit()
+    return redirect(url_for('vista_gestion_entidades'))
 
 @app.route('/cierre')
 def vista_cierre():
@@ -145,48 +267,43 @@ def vista_admin():
         return redirect(url_for('login'))
     
     productos = Producto.query.all()
-    return render_template('admin_almacenes.html', productos=productos)
+    almacenes = Almacen.query.all()
+    proveedores = Proveedor.query.all()
+    return render_template('admin_almacenes.html', productos=productos, almacenes=almacenes, proveedores=proveedores)
 
 
 @app.route('/guardar_producto', methods=['POST'])
 def guardar_producto():
-    # 1. Capturar los datos enviados desde el formulario
-    nombre = request.form.get('descripcion')
-    unidad_medida = request.form.get('unidad_medida', 'unidad')  # <-- Capturar unidad de medida
-    cantidad = float(request.form.get('cantidad', 0))
+    # 1. Obtener datos del formulario
+    nombre = request.form.get('nombre')
     precio_costo = float(request.form.get('precio_costo', 0))
     precio_venta = float(request.form.get('precio_venta', 0))
-    proveedor = request.form.get('proveedor')
-    estado_pago = request.form.get('estado_pago')
-    almacen_destino = request.form.get('almacen_destino')
-    
-   
-    # 2. Asignar cantidad según el almacén seleccionado
-    stock_almacen1 = cantidad if almacen_destino == 'almacen1' else 0.0
-    stock_almacen2 = cantidad if almacen_destino == 'almacen2' else 0.0
-    stock_venta = cantidad if almacen_destino == 'venta' else 0.0
+    proveedor_id = request.form.get('proveedor_id')  # ID del select de proveedores
+    almacen_id = request.form.get('almacen_id')      # ID del select de almacenes
+    cantidad_inicial = float(request.form.get('cantidad', 0))
 
-    # 3. Calcular monto pendiente si aplica
-    monto_pendiente = (cantidad * precio_costo) if estado_pago == 'Pendiente' else 0.0
-
-    # 4. Crear la instancia de Producto pasando la unidad elegida
+    # 2. Crear el Producto
     nuevo_producto = Producto(
         nombre=nombre,
-        unidad_medida=unidad_medida,  # <-- Se asigna la unidad recibida del formulario
         precio_costo=precio_costo,
         precio_venta=precio_venta,
-        proveedor=proveedor if proveedor else "Sin Proveedor",
-        stock_almacen1=stock_almacen1,
-        stock_almacen2=stock_almacen2,
-        stock_venta=stock_venta,
-        estado_pago=estado_pago,
-        monto_pendiente=monto_pendiente
+        proveedor_id=int(proveedor_id) if proveedor_id else None
     )
-    
     db.session.add(nuevo_producto)
+    db.session.flush()  # Para obtener el ID generado del nuevo_producto
+
+    # 3. Crear el registro en StockAlmacen (VINCULA EL ALMACÉN Y LA CANTIDAD)
+    if almacen_id:
+        nuevo_stock = StockAlmacen(
+            producto_id=nuevo_producto.id,
+            almacen_id=int(almacen_id),
+            cantidad=cantidad_inicial
+        )
+        db.session.add(nuevo_stock)
+
     db.session.commit()
-    
     return redirect(url_for('vista_admin'))
+
 @app.route('/eliminar_producto/<int:id>', methods=['POST'])
 def eliminar_producto(id):
     producto = Producto.query.get_or_404(id)
@@ -500,7 +617,72 @@ def registrar_movimiento():
     db.session.commit()
 
     return redirect(url_for('vista_admin'))
+# -----------------------------------------------------------------#
+# RESPALDO Y RESTAURACIÓN DE BASE DE DATOS
+# -----------------------------------------------------------------#
 
+DB_NAME = 'sumix.db'
+
+@app.route('/admin/exportar-db')
+def exportar_db():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    try:
+        # Buscar en la carpeta 'instance'
+        db_path = os.path.join(app.root_path, 'instance', DB_NAME)
+        
+        # Si no existe en 'instance', buscar en la raíz del proyecto
+        if not os.path.exists(db_path):
+            db_path = os.path.join(app.root_path, DB_NAME)
+
+        if not os.path.exists(db_path):
+            flash("No se encontró el archivo de la base de datos.", "error")
+            return redirect(url_for('vista_gestion_entidades'))
+
+        # Genera el archivo para descargar
+        return send_file(
+            db_path,
+            as_attachment=True,
+            download_name=f"respaldo_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        )
+    except Exception as e:
+        flash(f"Error al exportar la base de datos: {str(e)}", "error")
+        return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/importar-db', methods=['POST'])
+def importar_db():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    if 'archivo_db' not in request.files:
+        flash("No se seleccionó ningún archivo.", "error")
+        return redirect(url_for('vista_gestion_entidades'))
+        
+    file = request.files['archivo_db']
+    
+    if file.filename == '':
+        flash("No se seleccionó ningún archivo.", "error")
+        return redirect(url_for('vista_gestion_entidades'))
+
+    if file and (file.filename.endswith('.db') or file.filename.endswith('.sqlite')):
+        # Determinar la ubicación de destino
+        db_path = os.path.join(app.root_path, 'instance', DB_NAME)
+        if not os.path.exists(db_path):
+            db_path = os.path.join(app.root_path, DB_NAME)
+
+        # Cerrar las conexiones activas antes de sobrescribir el archivo
+        db.session.remove()
+        db.engine.dispose()
+
+        # Guardar y reemplazar la base de datos
+        file.save(db_path)
+        flash("¡Base de datos restaurada con éxito! Reinicia la sesión si es necesario.", "info")
+    else:
+        flash("Formato de archivo no válido. Debe ser un archivo .db o .sqlite", "error")
+
+    return redirect(url_for('vista_gestion_entidades'))
 
 if __name__ == '__main__':
     with app.app_context():
@@ -513,3 +695,4 @@ if __name__ == '__main__':
             print("¡Base de datos y usuario admin creados exitosamente!")
             
     app.run(debug=True)
+    

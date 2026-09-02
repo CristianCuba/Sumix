@@ -12,3 +12,96 @@ input::-webkit-inner-spin-button {
 input[type=number] {
     -moz-appearance: textfield;
 }
+.db-tools-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+.db-card {
+    background: #1e1e24;
+    border: 1px solid #2d2d38;
+    border-radius: 12px;
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.db-card-info h3 {
+    margin: 0 0 0.25rem 0;
+    font-size: 1.1rem;
+    color: #fff;
+}
+
+.db-card-info p {
+    margin: 0;
+    font-size: 0.85rem;
+    color: #a0a0ab;
+}
+
+/* Botones genéricos */
+.btn-db {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.btn-export {
+    background: #2563eb;
+    color: #fff;
+}
+
+.btn-export:hover {
+    background: #1d4ed8;
+}
+
+.btn-import {
+    background: #dc2626;
+    color: #fff;
+}
+
+.btn-import:hover {
+    background: #b91c1c;
+}
+
+/* Formulario e Input custom */
+.restore-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.file-dropzone {
+    flex: 1;
+    background: #121215;
+    border: 1px dashed #3f3f4e;
+    border-radius: 8px;
+    padding: 0.6rem;
+    color: #a0a0ab;
+    font-size: 0.85rem;
+    text-align: center;
+    cursor: pointer;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.file-dropzone:hover {
+    border-color: #2563eb;
+    color: #fff;
+}
+
+.file-dropzone input[type="file"] {
+    display: none;
+}
