@@ -2,6 +2,9 @@ import os
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
+import time
+from datetime import datetime  # Si la usas en otras partes
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sumix.db'
@@ -127,10 +130,44 @@ class DetalleCierre(db.Model):
     vendidos = db.Column(db.Float, default=0.0)
     subtotal = db.Column(db.Float, default=0.0)
 
+class TipoOperacion(db.Model):
+    __tablename__ = 'tipos_operacion'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), nullable=False) # Ej: "Traslado Interno", "Entrada de Inventario", "Salida / Ajuste"
+    codigo = db.Column(db.String(20), unique=True, nullable=False) # 'traslado', 'entrada', 'salida'
+    
+    # Comportamiento del tipo de operación:
+    # 'traslado' -> Requiere Origen y Destino
+    # 'entrada'  -> Solo requiere Destino
+    # 'salida'   -> Solo requiere Origen
+    requiere_origen = db.Column(db.Boolean, default=True)
+    requiere_destino = db.Column(db.Boolean, default=True)
 
+    conceptos = db.relationship('ConceptoMovimiento', backref='tipo', cascade='all, delete-orphan', lazy=True)
+
+
+class ConceptoMovimiento(db.Model):
+    __tablename__ = 'conceptos_movimiento'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    tipo_id = db.Column(db.Integer, db.ForeignKey('tipos_operacion.id'), nullable=False)
 # -----------------------------------------------------------------#
 # CONTROL DE RUTAS Y NAVEGACIÓN
 # -----------------------------------------------------------------#
+from flask import jsonify
+
+@app.route('/api/tipos_operacion', methods=['GET'])
+def api_tipos_operacion():
+    # Obtener todos los tipos de operación registrados
+    tipos = TipoOperacion.query.all()
+    return jsonify([{'id': t.id, 'nombre': t.nombre} for t in tipos])
+
+@app.route('/api/conceptos/<int:tipo_id>', methods=['GET'])
+def api_conceptos_por_tipo(tipo_id):
+    # Obtener únicamente los conceptos pertenecientes al tipo_id seleccionado
+    conceptos = ConceptoMovimiento.query.filter_by(tipo_id=tipo_id).all()
+    return jsonify([{'id': c.id, 'nombre': c.nombre} for c in conceptos])
+
 
 @app.route('/')
 def inicio():
@@ -172,7 +209,93 @@ from sqlalchemy import case
 # -----------------------------------------------------------------#
 # GESTIÓN DE ALMACENES Y PROVEEDORES
 # -----------------------------------------------------------------#
+# --- RUTAS DE GESTIÓN DE CONCEPTOS ---
 
+# --- RUTAS DE GESTIÓN DE TIPOS DE OPERACIÓN Y CONCEPTOS ---
+
+@app.route('/admin/tipo-operacion/nuevo', methods=['POST'])
+def guardar_tipo_operacion():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    nombre = request.form.get('nombre')
+    comportamiento = request.form.get('comportamiento') # 'traslado', 'entrada', 'salida'
+
+    if nombre and comportamiento:
+        codigo = comportamiento.lower() + "_" + str(int(time.time()))
+        
+        req_origen = comportamiento in ['traslado', 'salida']
+        req_destino = comportamiento in ['traslado', 'entrada']
+
+        nuevo_tipo = TipoOperacion(
+            nombre=nombre.strip(),
+            codigo=codigo,
+            requiere_origen=req_origen,
+            requiere_destino=req_destino
+        )
+        db.session.add(nuevo_tipo)
+        db.session.commit()
+        flash("Tipo de operación creado exitosamente", "info")
+
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/tipo-operacion/eliminar/<int:id>', methods=['POST'])
+def eliminar_tipo_operacion(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    tipo = TipoOperacion.query.get_or_404(id)
+    db.session.delete(tipo)
+    db.session.commit()
+    flash("Tipo de operación eliminado", "info")
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/concepto/nuevo', methods=['POST'])
+def guardar_concepto():
+    nombre = request.form.get('nombre')
+    tipo_id = request.form.get('tipo_id')
+
+    # Instanciar ÚNICAMENTE con los campos válidos del modelo
+    nuevo_concepto = ConceptoMovimiento(
+        nombre=nombre,
+        tipo_id=int(tipo_id) if tipo_id else None
+    )
+
+    db.session.add(nuevo_concepto)
+    db.session.commit()
+
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+@app.route('/admin/concepto/eliminar/<int:id>', methods=['POST'])
+def eliminar_concepto(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    concepto = ConceptoMovimiento.query.get_or_404(id)
+    db.session.delete(concepto)
+    db.session.commit()
+    flash("Concepto eliminado", "info")
+    return redirect(url_for('vista_gestion_entidades'))
+
+
+# --- API JSON PARA MODAL DINÁMICO ---
+
+@app.route('/api/tipos-operacion')
+def api_obtener_tipos_operacion():
+    tipos = TipoOperacion.query.all()
+    res = []
+    for t in tipos:
+        res.append({
+            'id': t.id,
+            'nombre': t.nombre,
+            'requiere_origen': t.requiere_origen,
+            'requiere_destino': t.requiere_destino,
+            'conceptos': [{'id': c.id, 'nombre': c.nombre} for c in t.conceptos]
+        })
+    return jsonify(res)
 @app.route('/admin/gestion-entidades', methods=['GET'])
 def vista_gestion_entidades():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -180,8 +303,16 @@ def vista_gestion_entidades():
         
     almacenes = Almacen.query.all()
     proveedores = Proveedor.query.all()
-    return render_template('admin_gestion.html', almacenes=almacenes, proveedores=proveedores)
+    tipos_operacion = TipoOperacion.query.all()
+    conceptos = ConceptoMovimiento.query.all()
 
+    return render_template(
+        'admin_gestion.html',
+        almacenes=almacenes,
+        proveedores=proveedores,
+        tipos_operacion=tipos_operacion,
+        conceptos=conceptos
+    )
 
 @app.route('/admin/almacen/nuevo', methods=['POST'])
 def guardar_almacen():
@@ -262,15 +393,28 @@ def vista_cierre():
 
 @app.route('/admin')
 def vista_admin():
-    """Vista exclusiva para el Administrador (Almacenes e Inventario)."""
+    # Validar sesión de administrador
     if 'user' not in session or session.get('rol') != 'admin':
         return redirect(url_for('login'))
-    
-    productos = Producto.query.all()
-    almacenes = Almacen.query.all()
-    proveedores = Proveedor.query.all()
-    return render_template('admin_almacenes.html', productos=productos, almacenes=almacenes, proveedores=proveedores)
 
+    # 1. Obtener los tipos de operación creados dinámicamente
+    tipos_operaciones = TipoOperacion.query.all()
+    
+    # 2. Obtener la lista general de almacenes y productos
+    almacenes = Almacen.query.all()
+    productos = Producto.query.all()
+    
+    # 3. Obtener todos los conceptos registrados
+    conceptos = ConceptoMovimiento.query.all()
+
+    # Renderizar la vista pasando todas las variables necesarias al template
+    return render_template(
+        'admin_almacenes.html',
+        tipos_operaciones=tipos_operaciones,
+        almacenes=almacenes,
+        productos=productos,
+        conceptos=conceptos
+    )
 
 @app.route('/guardar_producto', methods=['POST'])
 def guardar_producto():
@@ -559,64 +703,122 @@ def eliminar_usuario(id):
 
 @app.route('/admin/producto/movimiento', methods=['POST'])
 def registrar_movimiento():
+    print("\n--- [DEBUG] DATOS RECIBIDOS DEL FORMULARIO ---")
+    for key, value in request.form.items():
+        print(f"  {key}: {repr(value)}")
+    print("---------------------------------------------\n")
+
     if 'user' not in session or session.get('rol') != 'admin':
         return redirect(url_for('login'))
 
     producto_id = int(request.form.get('producto_id'))
-    tipo_op = request.form.get('tipo_operacion') # 'entrada', 'salida', 'traslado'
+    tipo_op_id = request.form.get('tipo_operacion', '')  # Llega el ID de TipoOperacion
     concepto = request.form.get('concepto')
     cantidad = float(request.form.get('cantidad') or 0.0)
 
-    producto = Producto.query.get_or_404(producto_id)
-
     if cantidad <= 0:
+        flash("La cantidad debe ser mayor a cero.", "error")
         return redirect(url_for('vista_admin'))
 
-    def get_stock(loc):
-        if loc == 'almacen1': return producto.stock_almacen1
-        if loc == 'almacen2': return producto.stock_almacen2
-        if loc == 'venta': return producto.stock_venta
-        return 0.0
+    producto = Producto.query.get_or_404(producto_id)
 
-    def set_stock(loc, valor):
-        if loc == 'almacen1': producto.stock_almacen1 = valor
-        elif loc == 'almacen2': producto.stock_almacen2 = valor
-        elif loc == 'venta': producto.stock_venta = valor
+    # 1. Obtener la entidad de TipoOperacion para extraer su 'codigo' ('traslado', 'entrada', 'salida')
+    tipo_operacion_obj = TipoOperacion.query.get(tipo_op_id) if tipo_op_id else None
 
-    origen = None
-    destino = None
+    if not tipo_operacion_obj:
+        print("ERR: No se encontró TipoOperacion con ID:", tipo_op_id)
+        flash("Tipo de operación inválido.", "error")
+        return redirect(url_for('vista_admin'))
+
+    tipo_op = tipo_operacion_obj.codigo.lower().strip()
+    print(f"--> CÓDIGO DETECTADO: '{tipo_op}'")  # REVISAR ESTE PRINT EN LA CONSOLA
+
+    def get_or_create_stock(almacen_id):
+        stock = StockAlmacen.query.filter_by(
+            producto_id=producto.id, 
+            almacen_id=almacen_id
+        ).first()
+        if not stock:
+            stock = StockAlmacen(producto_id=producto.id, almacen_id=almacen_id, cantidad=0.0)
+            db.session.add(stock)
+        return stock
+
+    origen_nombre = None
+    destino_nombre = None
 
     if tipo_op == 'entrada':
-        destino = request.form.get('ubicacion_destino')
-        set_stock(destino, get_stock(destino) + cantidad)
+        destino_id = request.form.get('ubicacion_destino')
+        if destino_id:
+            almacen_dest = Almacen.query.get(int(destino_id))
+            if almacen_dest:
+                stk_destino = get_or_create_stock(almacen_dest.id)
+                stk_destino.cantidad += cantidad
+                destino_nombre = almacen_dest.nombre
 
     elif tipo_op == 'salida':
-        origen = request.form.get('ubicacion_origen')
-        stk_actual = get_stock(origen)
-        set_stock(origen, max(0.0, stk_actual - cantidad))
+        origen_id = request.form.get('ubicacion_origen')
+        destino_input = request.form.get('ubicacion_destino')
+
+        if origen_id:
+            almacen_orig = Almacen.query.get(int(origen_id))
+            if almacen_orig:
+                stk_origen = get_or_create_stock(almacen_orig.id)
+                stk_origen.cantidad = max(0.0, stk_origen.cantidad - cantidad)
+                origen_nombre = almacen_orig.nombre
+
+        if destino_input:
+            if destino_input.isdigit():
+                almacen_dest = Almacen.query.get(int(destino_input))
+                destino_nombre = almacen_dest.nombre if almacen_dest else destino_input
+            else:
+                destino_nombre = destino_input
 
     elif tipo_op == 'traslado':
-        origen = request.form.get('ubicacion_origen')
-        destino = request.form.get('ubicacion_destino')
-        
-        if origen != destino:
-            stk_origen = get_stock(origen)
-            descuento = min(stk_origen, cantidad)
-            set_stock(origen, stk_origen - descuento)
-            set_stock(destino, get_stock(destino) + descuento)
+        origen_id = request.form.get('ubicacion_origen')
+        destino_id = request.form.get('ubicacion_destino')
 
+        if origen_id and destino_id and origen_id != destino_id:
+            almacen_orig = Almacen.query.get(int(origen_id))
+            almacen_dest = Almacen.query.get(int(destino_id))
+
+            if almacen_orig and almacen_dest:
+                stk_origen = get_or_create_stock(almacen_orig.id)
+                stk_destino = get_or_create_stock(almacen_dest.id)
+
+                # Descontar del origen y sumar exacto al destino
+                stk_origen.cantidad = max(0.0, stk_origen.cantidad - cantidad)
+                stk_destino.cantidad += cantidad
+
+                origen_nombre = almacen_orig.nombre
+                destino_nombre = almacen_dest.nombre
+
+    # 2. Registrar trazabilidad del movimiento
     log_mov = Movimiento(
         producto_id=producto.id,
         tipo_movimiento=tipo_op,
         concepto=concepto,
         cantidad=cantidad,
-        origen=origen,
-        destino=destino
+        origen=origen_nombre,
+        destino=destino_nombre
     )
+
     db.session.add(log_mov)
     db.session.commit()
 
+    flash("Movimiento registrado con éxito.", "info")
     return redirect(url_for('vista_admin'))
+
+
+@app.route('/api/conceptos/<int:tipo_id>', methods=['GET'])
+def obtener_conceptos_por_tipo(tipo_id):
+    try:
+        # Se corrigió tipo_operacion_id por tipo_id para coincidir con el modelo ConceptoMovimiento
+        conceptos = ConceptoMovimiento.query.filter_by(tipo_id=tipo_id).all()
+        data = [{'id': c.id, 'nombre': c.nombre} for c in conceptos]
+        return jsonify(data), 200
+    except Exception as e:
+        print(f"Error al obtener conceptos: {e}")
+        return jsonify({'error': 'Error interno al consultar conceptos'}), 500
 # -----------------------------------------------------------------#
 # RESPALDO Y RESTAURACIÓN DE BASE DE DATOS
 # -----------------------------------------------------------------#

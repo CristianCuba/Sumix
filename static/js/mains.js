@@ -1,62 +1,132 @@
 // ==========================================
 // MODAL DE MOVIMIENTOS E INVENTARIO
 // ==========================================
-function abrirModalMovimiento(id, nombre) {
-    document.getElementById('mov-producto-id').value = id;
-    document.getElementById('mov-producto-nombre').innerText = nombre;
-    actualizarCamposMovimiento();
-    const modal = document.getElementById('modal-movimiento');
+
+// Diccionario de conceptos de respaldo (fallback por si falla la API)
+const conceptosFallback = {
+    'ENTRADA': ['Compra de Proveedor', 'Ajuste de Inventario (Entrada)', 'Devolución de Cliente', 'Mercancía Inicial'],
+    'SALIDA': ['Ajuste por Merma/Pérdida', 'Consumo Interno', 'Devolución a Proveedor', 'Ajuste de Inventario (Salida)'],
+    'TRANSFERENCIA': ['Traslado a Área de Venta', 'Traslado entre Almacenes', 'Reubicación Interna']
+};// Diccionario de conceptos de respaldo (fallback)
+function abrirModalMovimiento(btn) {
+    const id = btn.dataset.id;
+    const descripcion = btn.dataset.descripcion;
+
+    const inputId = document.getElementById('mov-producto-id') || document.getElementById('producto_id_movimiento');
+    const labelNombre = document.getElementById('mov-producto-nombre') || document.getElementById('nombre_producto_movimiento');
+    const modal = document.getElementById('modal-movimiento') || document.getElementById('modalMovimiento');
+
+    if (inputId) inputId.value = id;
+    if (labelNombre) labelNombre.textContent = descripcion || 'Sin descripción';
+    
     if (modal) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+    } else {
+        console.error("No se encontró el modal de movimiento.");
     }
+
+    seleccionarTipoOperacion();
 }
 
 function cerrarModalMovimiento() {
-    const modal = document.getElementById('modal-movimiento');
+    const modal = document.getElementById('modal-movimiento') || document.getElementById('modalMovimiento');
     if (modal) {
         modal.classList.remove('flex');
         modal.classList.add('hidden');
     }
 }
 
-function actualizarCamposMovimiento() {
-    const opSelect = document.getElementById('tipo_operacion');
-    if (!opSelect) return;
-
-    const op = opSelect.value;
-    const selectConcepto = document.getElementById('concepto');
+async function seleccionarTipoOperacion() {
+    const tipoSelect = document.getElementById('tipo_operacion');
+    const conceptoSelect = document.getElementById('concepto');
     const blockOrigen = document.getElementById('block-origen');
     const blockDestino = document.getElementById('block-destino');
 
-    if (!selectConcepto) return;
+    if (!tipoSelect || !conceptoSelect) return;
 
-    selectConcepto.innerHTML = '';
+    const tipoId = tipoSelect.value;
 
-    if (op === 'traslado') {
-        selectConcepto.innerHTML = '<option value="Traslado Interno">Traslado entre Áreas</option>';
-        if (blockOrigen) blockOrigen.classList.remove('hidden');
-        if (blockDestino) blockDestino.classList.remove('hidden');
-    } else if (op === 'entrada') {
-        selectConcepto.innerHTML = `
-            <option value="Compra / Reposición">Compra / Reposición</option>
-            <option value="Ajuste Positivo">Ajuste de Inventario (+)</option>
-            <option value="Devolución">Devolución de Cliente</option>
-        `;
-        if (blockOrigen) blockOrigen.classList.add('hidden');
-        if (blockDestino) blockDestino.classList.remove('hidden');
-    } else if (op === 'salida') {
-        selectConcepto.innerHTML = `
-            <option value="Venta Directa">Venta Directa</option>
-            <option value="Merma / Deterioro">Merma / Deterioro</option>
-            <option value="Autoconsumo">Autoconsumo / Uso Interno</option>
-            <option value="Ajuste Negativo">Ajuste de Inventario (-)</option>
-        `;
-        if (blockOrigen) blockOrigen.classList.remove('hidden');
-        if (blockDestino) blockDestino.classList.add('hidden');
+    if (!tipoId) {
+        conceptoSelect.innerHTML = '<option value="">-- Selecciona un tipo primero --</option>';
+        if (blockOrigen) blockOrigen.style.display = 'block';
+        if (blockDestino) blockDestino.style.display = 'block';
+        return;
+    }
+
+    const selectedOption = tipoSelect.options[tipoSelect.selectedIndex];
+    const tipoTexto = selectedOption ? selectedOption.textContent.toUpperCase() : '';
+    
+    // 1. Obtener valores de los atributos HTML (data-origen / data-destino)
+    const attrOrigen = selectedOption.getAttribute('data-origen');
+    const attrDestino = selectedOption.getAttribute('data-destino');
+
+    // 2. Lógica para determinar si se muestra u oculta
+    let mostrarOrigen = true;
+    let mostrarDestino = true;
+
+    if (attrOrigen !== null && attrDestino !== null) {
+        // Usa los atributos del modelo si existen
+        mostrarOrigen = (attrOrigen === 'true');
+        mostrarDestino = (attrDestino === 'true');
+    } else {
+        // Fallback leyendo el texto de la opción seleccionada
+        if (tipoTexto.includes('ENTRADA') || tipoTexto.includes('COMPRA')) {
+            mostrarOrigen = false;
+            mostrarDestino = true;
+        } else if (tipoTexto.includes('SALIDA') || tipoTexto.includes('MERMA')) {
+            mostrarOrigen = true;
+            mostrarDestino = false;
+        } else { // TRASLADO / TRANSFERENCIA
+            mostrarOrigen = true;
+            mostrarDestino = true;
+        }
+    }
+
+    // Aplicar estilos a los bloques
+    if (blockOrigen) blockOrigen.style.display = mostrarOrigen ? 'block' : 'none';
+    if (blockDestino) blockDestino.style.display = mostrarDestino ? 'block' : 'none';
+
+    // 3. Cargar conceptos dinámicos desde la API
+    conceptoSelect.innerHTML = '<option value="">Cargando conceptos...</option>';
+
+    try {
+        const response = await fetch(`/api/conceptos/${tipoId}`);
+        if (!response.ok) throw new Error('Error al consultar conceptos');
+        
+        const conceptos = await response.json();
+        conceptoSelect.innerHTML = '';
+
+        if (conceptos.length === 0) {
+            conceptoSelect.innerHTML = '<option value="">Sin conceptos disponibles</option>';
+        } else {
+            conceptos.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.nombre;
+                opt.textContent = c.nombre;
+                conceptoSelect.appendChild(opt);
+            });
+        }
+    } catch (error) {
+        console.error("Error al cargar conceptos:", error);
+        conceptoSelect.innerHTML = '<option value="">Error al cargar conceptos</option>';
     }
 }
-
+function cargarConceptosFallback(selectElement, clave) {
+    const opciones = conceptosFallback[clave] || [];
+    selectElement.innerHTML = '';
+    
+    if (opciones.length === 0) {
+        selectElement.innerHTML = '<option value="">-- Sin conceptos disponibles --</option>';
+    } else {
+        opciones.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c;
+            opt.textContent = c;
+            selectElement.appendChild(opt);
+        });
+    }
+}
 
 // ==========================================
 // MODAL DE PRODUCTOS
@@ -138,8 +208,7 @@ function calcular() {
         // 1. Calculamos la diferencia entre el efectivo ingresado y el total esperado
         let diferencia = Math.abs(efectivoFisico - totalEsperado);
 
-        // 2. La caja cuadra solo si la diferencia es 0 (usamos < 0.01 por decimales en JS) 
-        // y se ingresó un valor válido
+        // 2. La caja cuadra solo si la diferencia es 0 y se ingresó un valor válido
         let cajaCuadrada = valorCajaRaw !== '' && !isNaN(efectivoFisico) && diferencia < 0.01;
 
         if (cajaCuadrada) {
@@ -218,44 +287,6 @@ async function enviarCierre() {
 
 
 // ==========================================
-// INICIALIZACIÓN DE EVENTOS AL CARGAR EL DOM
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Sugerencia de margen +30% en creación de producto
-    const inputCosto = document.getElementById('precio_costo');
-    const inputVenta = document.getElementById('precio_venta');
-    const textoSugerencia = document.getElementById('sugerencia_texto');
-
-    if (inputCosto && inputVenta) {
-        inputCosto.addEventListener('input', () => {
-            const costo = parseFloat(inputCosto.value) || 0;
-
-            if (costo > 0) {
-                const sugerido = (costo * 1.30).toFixed(2);
-                inputVenta.value = sugerido;
-
-                if (textoSugerencia) {
-                    textoSugerencia.textContent = `Sugerido (+30%): $${sugerido}`;
-                }
-            } else {
-                inputVenta.value = '';
-                if (textoSugerencia) {
-                    textoSugerencia.textContent = '';
-                }
-            }
-        });
-    }
-
-    // 2. Escuchador para el buscador tipo píldora de cierre.html
-    const inputBuscador = document.getElementById('buscador');
-    if (inputBuscador) {
-        inputBuscador.addEventListener('keyup', filtrarProductos);
-    }
-
-    // 3. Ejecutar cálculo inicial si estamos en la vista de cierre
-    calcular();
-});
-// ==========================================
 // CONSULTA Y MODAL DE DETALLE DE CIERRE
 // ==========================================
 async function verDetalleCierre(idCierre) {
@@ -328,6 +359,11 @@ function cerrarModalDetalleCierre() {
         modal.classList.add('hidden');
     }
 }
+
+
+// ==========================================
+// UTILIDADES
+// ==========================================
 function actualizarNombreArchivo(input) {
     const label = document.getElementById('file-label-text');
     if (input.files && input.files[0]) {
@@ -336,3 +372,43 @@ function actualizarNombreArchivo(input) {
         label.textContent = "Seleccionar archivo .db";
     }
 }
+
+
+// ==========================================
+// INICIALIZACIÓN DE EVENTOS AL CARGAR EL DOM
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Sugerencia de margen +30% en creación de producto
+    const inputCosto = document.getElementById('precio_costo');
+    const inputVenta = document.getElementById('precio_venta');
+    const textoSugerencia = document.getElementById('sugerencia_texto');
+
+    if (inputCosto && inputVenta) {
+        inputCosto.addEventListener('input', () => {
+            const costo = parseFloat(inputCosto.value) || 0;
+
+            if (costo > 0) {
+                const sugerido = (costo * 1.30).toFixed(2);
+                if (!inputVenta.value) {
+                    inputVenta.value = sugerido;
+                }
+                if (textoSugerencia) {
+                    textoSugerencia.textContent = `Sugerido (+30%): $${sugerido}`;
+                }
+            } else {
+                if (textoSugerencia) {
+                    textoSugerencia.textContent = '';
+                }
+            }
+        });
+    }
+
+    // 2. Escuchador para el buscador de productos en cierre
+    const inputBuscador = document.getElementById('buscador');
+    if (inputBuscador) {
+        inputBuscador.addEventListener('keyup', filtrarProductos);
+    }
+
+    // 3. Ejecutar cálculo inicial si estamos en la vista de cierre
+    calcular();
+});

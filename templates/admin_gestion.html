@@ -209,6 +209,126 @@
         </form>
     </div>
 </div>
+<!-- SECCIÓN GESTIÓN DE CONCEPTOS DE MOVIMIENTO -->
+<!-- SECCIÓN GESTIÓN DE TIPOS DE OPERACIÓN Y CONCEPTOS -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+    <!-- Tarjeta: Crear y Listar Tipos de Operación -->
+    <div class="bg-[#18191c] border border-gray-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span>⚙️</span> Tipos de Operación
+        </h2>
+
+        <form action="/admin/tipo-operacion/nuevo" method="POST" class="space-y-3 mb-6">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre</label>
+                <input type="text" name="nombre" required placeholder="Ej. Donación, Ajuste Interno..."
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Comportamiento Logístico</label>
+                <select name="comportamiento" required
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                    <option value="traslado">Traslado (Origen ➔ Destino)</option>
+                    <option value="entrada">Entrada (Solo Destino)</option>
+                    <option value="salida">Salida (Solo Origen)</option>
+                </select>
+            </div>
+            <button type="submit"
+                class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2.5 rounded-xl transition-all shadow-lg shadow-orange-600/20">
+                + Crear Tipo de Operación
+            </button>
+        </form>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-gray-300">
+                <thead class="text-xs uppercase bg-[#121316] text-gray-400 border-b border-gray-800">
+                    <tr>
+                        <th class="p-3">Nombre</th>
+                        <th class="p-3">Estructura</th>
+                        <th class="p-3 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for t in tipos_operacion %}
+                    <tr class="hover:bg-gray-800/40">
+                        <td class="p-3 font-medium text-white">{{ t.nombre }}</td>
+                        <td class="p-3 text-xs text-gray-400">
+                            {% if t.requiere_origen and t.requiere_destino %} Origen ➔ Destino
+                            {% elif t.requiere_destino %} Solo Destino
+                            {% else %} Solo Origen {% endif %}
+                        </td>
+                        <td class="p-3 text-right">
+                            <form action="/admin/tipo-operacion/eliminar/{{ t.id }}" method="POST" class="inline"
+                                onsubmit="return confirm('¿Eliminar tipo de operación?');">
+                                <button type="submit"
+                                    class="text-red-400 hover:text-red-300 font-semibold text-xs">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Tarjeta: Crear y Listar Conceptos -->
+    <div class="bg-[#18191c] border border-gray-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <span>🏷️</span> Conceptos de Movimiento
+        </h2>
+
+        <form action="/admin/concepto/nuevo" method="POST" class="space-y-3 mb-6">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Pertenece al Tipo de
+                    Operación</label>
+                <select name="tipo_id" required
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                    {% for t in tipos_operacion %}
+                    <option value="{{ t.id }}">{{ t.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre del Concepto</label>
+                <input type="text" name="nombre" required placeholder="Ej. Reabastecimiento, Rotura..."
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+            </div>
+            <button type="submit"
+                class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2.5 rounded-xl transition-all shadow-lg shadow-orange-600/20">
+                + Crear Concepto
+            </button>
+        </form>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm text-gray-300">
+                <thead class="text-xs uppercase bg-[#121316] text-gray-400 border-b border-gray-800">
+                    <tr>
+                        <th class="p-3">Concepto</th>
+                        <th class="p-3">Tipo</th>
+                        <th class="p-3 text-right">Acción</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for c in conceptos %}
+                    <tr class="hover:bg-gray-800/40">
+                        <td class="p-3 font-medium text-white">{{ c.nombre }}</td>
+                        <td class="p-3 text-xs text-orange-400 font-medium">{{ c.tipo.nombre }}</td>
+                        <td class="p-3 text-right">
+                            <form action="/admin/concepto/eliminar/{{ c.id }}" method="POST" class="inline"
+                                onsubmit="return confirm('¿Eliminar concepto?');">
+                                <button type="submit"
+                                    class="text-red-400 hover:text-red-300 font-semibold text-xs">Eliminar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
 <script>
     function abrirModalAlmacen() { document.getElementById('modal-almacen').classList.remove('hidden'); document.getElementById('modal-almacen').classList.add('flex'); }
     function cerrarModalAlmacen() { document.getElementById('modal-almacen').classList.remove('flex'); document.getElementById('modal-almacen').classList.add('hidden'); }

@@ -18,45 +18,48 @@
             <span>Nuevo Producto</span>
         </button>
     </header>
-
+    
     <!-- Tabla Detallada de Inventario -->
     <section class="p-6 flex-1">
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
-                    <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-[#222429]">
-                        <th class="p-4">Código</th>
-                        <th class="p-4">Descripción</th>
-                        <th class="p-4">U.M.</th>
-                        <th class="p-4 text-center">Stock</th>
-                        <th class="p-4 text-center">Ubicación / Almacén</th>
-                        <th class="p-4 text-right">P. Costo</th>
-                        <th class="p-4 text-right">P. Venta</th>
-                        <th class="p-4">Proveedor</th>
-                        <th class="p-4 text-right">Acción</th>
-                        <th class="p-4 text-right">Del.</th>
-                    </tr>
+                        <tr
+                            class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider bg-[#222429]">
+                            <th class="p-4">Código</th>
+                            <th class="p-4">Descripción</th>
+                            <th class="p-4">U.M.</th>
+                            <th class="p-4 text-center">Stock</th>
+                            <th class="p-4 text-center">Ubicación / Almacén</th>
+                            <th class="p-4 text-right">P. Costo</th>
+                            <th class="p-4 text-right">P. Venta</th>
+                            <th class="p-4">Proveedor</th>
+                            <th class="p-4 text-right">Acción</th>
+                            <th class="p-4 text-center">Del.</th>
+                        </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-800/60 text-sm">
                         {% for p in productos %}
                         <tr class="hover:bg-gray-800/30 transition-colors">
                             <td class="p-4 font-mono text-gray-300">{{ p.codigo or 'N/A' }}</td>
-                            <td class="p-4 font-medium text-white">{{ p.nombre }}</td>
+                            <td class="p-4 font-medium text-white">{{ p.nombre or p.descripcion }}</td>
                             <td class="p-4 text-gray-400">{{ p.unidad_medida }}</td>
-                            
+    
                             <!-- Stock Consolidado (Total de todos los almacenes) -->
                             <td class="p-4 text-center font-bold text-emerald-400">
                                 {{ (p.cantidad_total | default(0)) | round(2) }}
                             </td>
-                            
+    
                             <!-- Almacenes / Ubicaciones asociadas -->
                             <td class="p-4 text-center">
                                 {% if p.stocks %}
                                 <div class="flex flex-wrap justify-center gap-1">
                                     {% for s in p.stocks %}
-                                    <span class="px-2 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50 text-xs">
-                                        {{ s.almacen.nombre }}: <strong class="text-white">{{ s.cantidad|round(2) }}</strong>
+                                    <span
+                                        class="px-2 py-0.5 rounded bg-blue-900/40 text-blue-300 border border-blue-700/50 text-xs">
+                                        {{ s.almacen.nombre }}: <strong class="text-white">{{ s.cantidad|round(2)
+                                            }}</strong>
                                     </span>
                                     {% endfor %}
                                 </div>
@@ -64,7 +67,7 @@
                                 <span class="text-gray-500 italic text-xs">Sin stock en almacenes</span>
                                 {% endif %}
                             </td>
-                            
+    
                             <!-- Precios con protección contra valores nulos -->
                             <td class="p-4 text-right text-gray-300">
                                 ${{ (p.precio_costo | default(0)) | round(2) }}
@@ -72,14 +75,14 @@
                             <td class="p-4 text-right text-emerald-400 font-semibold">
                                 ${{ (p.precio_venta | default(0)) | round(2) }}
                             </td>
-                            
-                            <!-- Proveedor -->
+    
                             <!-- Columna Proveedor -->
                             <td class="p-4 text-gray-300">
                                 {{ p.proveedor.nombre if p.proveedor else 'N/A' }}
                             </td>
                             <td class="p-4 text-right">
-                                <button onclick="abrirModalMovimiento('{{ p.id }}', '{{ p.descripcion }}')"
+                                <button onclick="abrirModalMovimiento(this)" data-id="{{ p.id }}"
+                                    data-descripcion="{{ p.nombre or p.descripcion }}"
                                     class="px-3 py-1.5 bg-gray-800 hover:bg-orange-600 hover:text-white text-gray-300 font-semibold rounded-lg text-xs transition flex items-center gap-1 ml-auto border border-gray-700">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -88,8 +91,7 @@
                                     <span>Mover</span>
                                 </button>
                             </td>
-                            <td class="p-4 flex items-center justify-center gap-2">
-                                <!-- Formulario para eliminar -->
+                            <td class="p-4 text-center">
                                 <form action="{{ url_for('eliminar_producto', id=p.id) }}" method="POST"
                                     onsubmit="return confirm('¿Estás seguro de que deseas eliminar este producto?');">
                                     <button type="submit"
@@ -102,182 +104,183 @@
                         {% endfor %}
                     </tbody>
                 </table>
-
-                <!-- Modal: Registrar Movimiento de Inventario -->
-                <div id="modal-movimiento"
-                    class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-                    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-                        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
-                            <div>
-                                <h3 class="text-lg font-bold text-white">Movimiento de Inventario</h3>
-                                <p id="mov-producto-nombre" class="text-xs text-orange-400 font-medium mt-0.5"></p>
-                            </div>
-                            <button onclick="cerrarModalMovimiento()"
-                                class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
-                        </div>
-
-                        <form action="/admin/producto/movimiento" method="POST" class="space-y-4 text-sm">
-                            <input type="hidden" name="producto_id" id="mov-producto-id">
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Tipo de
-                                    Operación</label>
-                                <select name="tipo_operacion" id="tipo_operacion"
-                                    onchange="actualizarCamposMovimiento()"
-                                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                                    <option value="traslado">Traslado Interno</option>
-                                    <option value="entrada">Entrada de Inventario</option>
-                                    <option value="salida">Salida / Ajuste</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Concepto</label>
-                                <select name="concepto" id="concepto"
-                                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                                </select>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-3">
-                                <div id="block-origen">
-                                    <label
-                                        class="block text-xs font-semibold text-gray-400 uppercase mb-1">Origen</label>
-                                    <select name="ubicacion_origen" id="ubicacion_origen"
-                                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                                        <option value="almacen1">Almacén Central (1)</option>
-                                        <option value="almacen2">Almacén Auxiliar (2)</option>
-                                        <option value="venta">Área de Venta</option>
-                                    </select>
-                                </div>
-
-                                <div id="block-destino">
-                                    <label
-                                        class="block text-xs font-semibold text-gray-400 uppercase mb-1">Destino</label>
-                                    <select name="ubicacion_destino" id="ubicacion_destino"
-                                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                                        <option value="venta">Área de Venta</option>
-                                        <option value="almacen1">Almacén Central (1)</option>
-                                        <option value="almacen2">Almacén Auxiliar (2)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad
-                                    *</label>
-                                <input type="number" step="any" min="0.01" name="cantidad" required placeholder="0.00"
-                                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                            </div>
-
-                            <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
-                                <button type="button" onclick="cerrarModalMovimiento()"
-                                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
-                                <button type="submit"
-                                    class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Aplicar
-                                    Movimiento</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
             </div>
         </div>
     </section>
-
-
-<!-- Modal: Crear Nuevo Producto (Arreglado) -->
-<div id="modal-producto" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
-            <h3 class="text-lg font-bold text-white">Registrar Nuevo Producto</h3>
-            <button onclick="cerrarModalProducto()"
-                class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
-        </div>
-
-        <form method="POST" action="{{ url_for('guardar_producto') }}" class="space-y-4 text-sm">
-            <!-- Se corrigió name="nombre" a name="descripcion" -->
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Descripción / Nombre del
-                    Producto</label>
-                <input type="text" name="nombre" required placeholder="Ej: Malta Bucanero"
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none">
-            </div>
-
-            <!-- Campo de Ubicación/Almacén Agregado -->
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Almacen</label>
-                <select name="almacen_id" id="prod_almacen" required
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                    <option value="" disabled selected>Seleccione un Almacen</option>
-                    {% for almacen in almacenes %}
-                    <option value="{{ almacen.id }}">{{ almacen.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
+    
+    <!-- Modal: Registrar Movimiento de Inventario -->
+    <div id="modal-movimiento"
+        class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad</label>
-                    <input type="number" step="0.01" name="cantidad" required placeholder="0.00"
-                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                    <h3 class="text-lg font-bold text-white">Movimiento de Inventario</h3>
+                    <p id="mov-producto-nombre" class="text-xs text-orange-400 font-medium mt-0.5"></p>
                 </div>
-                <!-- Campo Unidad de Medida (Agregar justo debajo de Descripción/Nombre) -->
+                <button onclick="cerrarModalMovimiento()"
+                    class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+    
+            <form
+                action="{{ url_for('registrar_movimiento') if 'registrar_movimiento' in implicit_routes else '/admin/producto/movimiento' }}"
+                method="POST" class="space-y-4 text-sm">
+                <input type="hidden" name="producto_id" id="mov-producto-id">
+    
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad de Medida</label>
-                    <select name="unidad_medida" required
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Tipo de Operación</label>
+                    <!-- Atributos separados correctamente con espacio -->
+                    <select name="tipo_operacion" id="tipo_operacion" onchange="seleccionarTipoOperacion()"
                         class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                        <option value="unidad" selected>Unidad (u)</option>
-                        <option value="lb">Libras (lb)</option>
-                        <option value="kg">Kilogramos (kg)</option>
-                        <option value="caja">Caja</option>
-                        <option value="paquete">Paquete</option>
-                        <option value="litro">Litro (L)</option>
+                        <option value="">-- Selecciona un tipo --</option>
+                        {% for tipo in tipos_operaciones %}
+                        <option value="{{ tipo.id }}" data-origen="{{ 'true' if tipo.requiere_origen else 'false' }}"
+                            data-destino="{{ 'true' if tipo.requiere_destino else 'false' }}">
+                            {{ tipo.nombre }}
+                        </option>
+                        {% endfor %}
                     </select>
                 </div>
+    
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Precio Costo
-                        Unitario</label>
-                    <input type="number" step="0.01" id="precio_costo" name="precio_costo" required placeholder="0.00"
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Concepto</label>
+                    <select name="concepto" id="concepto" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                    </select>
+                </div>
+    
+                <div class="grid grid-cols-2 gap-3">
+                    <div id="block-origen">
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Origen</label>
+                        <select name="ubicacion_origen" id="ubicacion_origen"
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                            {% for almacen in almacenes %}
+                            <option value="{{ almacen.id }}">
+                                {{ almacen.nombre }}{% if almacen.es_area_venta %} (Área Venta){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+    
+                    <div id="block-destino">
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Destino</label>
+                        <select name="ubicacion_destino" id="ubicacion_destino"
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                            {% for almacen in almacenes %}
+                            <option value="{{ almacen.id }}">
+                                {{ almacen.nombre }}{% if almacen.es_area_venta %} (Área Venta){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+    
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad *</label>
+                    <input type="number" step="any" min="0.01" name="cantidad" required placeholder="0.00"
                         class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Precio Venta
-                        Unitario</label>
-                    <input type="number" step="0.01" id="precio_venta" name="precio_venta" required placeholder="0.00"
-                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                        <small id="sugerencia_texto" class="text-xs text-green-400 mt-1 block h-4"></small>
+    
+                <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                    <button type="button" onclick="cerrarModalMovimiento()"
+                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
+                    <button type="submit"
+                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Aplicar
+                        Movimiento</button>
                 </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Proveedor</label>
-                <select name="proveedor_id" id="prod_proveedor" required
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                    <option value="" disabled selected>Seleccione un proveedor</option>
-                    {% for proveedor in proveedores %}
-                    <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Estado del Pago</label>
-                <select name="estado_pago" required
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                    <option value="Pagado">Pagado al contado</option>
-                    <option value="Pendiente">Pendiente (A Crédito / Cuentas por Pagar)</option>
-                </select>
-            </div>
-
-            <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
-                <button type="button" onclick="cerrarModalProducto()"
-                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
-                <button type="submit"
-                    class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Guardar
-                    Producto</button>
-            </div>
-        </form>
+            </form>
+        </div>
     </div>
-</div>
+    
+    <!-- Modal: Crear Nuevo Producto -->
+    <div id="modal-producto" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white">Registrar Nuevo Producto</h3>
+                <button onclick="cerrarModalProducto()"
+                    class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+    
+            <form method="POST" action="{{ url_for('guardar_producto') }}" class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del
+                        Producto</label>
+                    <input type="text" name="nombre" required placeholder="Ej: Malta Bucanero"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none">
+                </div>
+    
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Almacén Inicial</label>
+                    <select name="almacen_id" id="prod_almacen" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="" disabled selected>Seleccione un Almacén</option>
+                        {% for almacen in almacenes %}
+                        <option value="{{ almacen.id }}">{{ almacen.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+    
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad Inicial</label>
+                        <input type="number" step="0.01" name="cantidad" required placeholder="0.00"
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad de Medida</label>
+                        <select name="unidad_medida" required
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                            <option value="u" selected>Unidad (u)</option>
+                            <option value="lb">Libras (lb)</option>
+                            <option value="kg">Kilogramos (kg)</option>
+                            <option value="caja">Caja</option>
+                            <option value="paquete">Paquete</option>
+                            <option value="L">Litro (L)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Costo Unitario</label>
+                        <input type="number" step="0.01" id="precio_costo" name="precio_costo" required placeholder="0.00"
+                            oninput="calcularSugerenciaVenta()"
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Venta Unitario</label>
+                        <input type="number" step="0.01" id="precio_venta" name="precio_venta" required placeholder="0.00"
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                        <small id="sugerencia_texto" class="text-xs text-emerald-400 mt-1 block h-4 font-mono"></small>
+                    </div>
+                </div>
+    
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Proveedor</label>
+                    <select name="proveedor_id" id="prod_proveedor" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="" disabled selected>Seleccione un proveedor</option>
+                        {% for proveedor in proveedores %}
+                        <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+    
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Estado del Pago</label>
+                    <select name="estado_pago" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="Pagado">Pagado al contado</option>
+                        <option value="Pendiente">Pendiente (A Crédito / Cuentas por Pagar)</option>
+                    </select>
+                </div>
+    
+                <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                    <button type="button" onclick="cerrarModalProducto()"
+                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
+                    <button type="submit"
+                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Guardar
+                        Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
 
 {% endblock %}
