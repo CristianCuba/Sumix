@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="p-6 max-w-7xl mx-auto space-y-6">
+<div class="p-6 max-w-7xl mx-auto space-y-8">
 
     <!-- Encabezado y Filtros -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-800 pb-4">
         <div>
             <h2 class="text-2xl font-bold text-white tracking-tight">Cuentas por Pagar</h2>
-            <p class="text-xs text-gray-400 mt-1">Gestión y control de deudas pendientes con proveedores</p>
+            <p class="text-xs text-gray-400 mt-1">Gestión de deudas pendientes e historial de pagos</p>
         </div>
 
         <!-- Filtro por Proveedor -->
@@ -15,9 +15,9 @@
             <select name="proveedor" onchange="this.form.submit()"
                 class="bg-[#121316] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 focus:border-orange-500 focus:outline-none">
                 <option value="">-- Todos los Proveedores --</option>
-                {% for prov in proveedores %}
-                <option value="{{ prov }}" {% if prov==proveedor_seleccionado %}selected{% endif %}>
-                    {{ prov }}
+                {% for proveedor in proveedores %}
+                <option value="{{ proveedor.id }}" {% if proveedor.id|string == proveedor_seleccionado %}selected{% endif %}>
+                    {{ proveedor.nombre }}
                 </option>
                 {% endfor %}
             </select>
@@ -29,15 +29,12 @@
         </form>
     </div>
 
-    <!-- Tarjeta Resumen de Deuda -->
-    <div
-        class="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-5 flex items-center justify-between shadow-lg">
+    <!-- Tarjeta Resumen + Botón WhatsApp -->
+    <div class="bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg">
         <div class="flex items-center gap-3">
             <div class="p-3 bg-amber-500/20 text-amber-400 rounded-xl">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
-                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                 </svg>
             </div>
             <div>
@@ -45,56 +42,115 @@
                 <p class="text-2xl font-black text-white font-mono mt-0.5">${{ "%.2f"|format(total_adeudado) }}</p>
             </div>
         </div>
+
+        <!-- Botón para Enviar Resumen por WhatsApp -->
+        {% if proveedor_obj and mensaje_wa %}
+        <a href="https://wa.me/{{ proveedor_obj.telefono or '' }}?text={{ mensaje_wa }}" target="_blank"
+            class="inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-900/30">
+            <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+            </svg>
+            Enviar Resumen a {{ proveedor_obj.nombre }}
+        </a>
+        {% endif %}
     </div>
 
-    <!-- Tabla de Cuentas Pendientes -->
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
-        <div class="overflow-x-auto">
-            <table class="w-full text-left border-collapse text-sm">
-                <thead>
-                    <tr
-                        class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                        <th class="p-4">Fecha</th>
-                        <th class="p-4">Producto</th>
-                        <th class="p-4">Proveedor</th>
-                        <th class="p-4 text-center">Cantidad</th>
-                        <th class="p-4 text-right">Pendiente</th>
-                        <th class="p-4 text-center">Acción</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-800/60 text-gray-300">
-                    {% for item in cuentas %}
-                    <tr class="hover:bg-gray-800/30 transition-colors">
-                        <td class="p-4 font-mono text-xs text-gray-400">{{ item.fecha_creacion.strftime('%Y-%m-%d') }}
-                        </td>
-                        <td class="p-4 font-semibold text-white">{{ item.nombre }}</td>
-                        <td class="p-4">
-                            <span
-                                class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                                {{ item.proveedor }}
-                            </span>
-                        </td>
-                        <td class="p-4 text-center font-mono">{{ item.cantidad_total }}</td>
-                        <td class="p-4 text-right font-mono font-bold text-amber-400">${{
-                            "%.2f"|format(item.monto_pendiente) }}</td>
-                        <td class="p-4 text-center">
-                            <form method="POST" action="{{ url_for('pagar_cuenta', id=item.id) }}">
-                                <button type="submit"
-                                    class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all shadow-md">
-                                    Marcar Pagado
-                                </button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="6" class="p-8 text-center text-gray-500 font-medium">
-                            No hay cuentas pendientes por pagar.
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <!-- Tabla Cuentas Pendientes -->
+    <div class="space-y-3">
+        <h3 class="text-lg font-bold text-white">Deudas Pendientes</h3>
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            <th class="p-4">Fecha</th>
+                            <th class="p-4">Producto</th>
+                            <th class="p-4">Proveedor</th>
+                            <th class="p-4 text-center">Cantidad</th>
+                            <th class="p-4 text-right">Pendiente</th>
+                            <th class="p-4 text-center">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/60 text-gray-300">
+                        {% for item in cuentas %}
+                        <tr class="hover:bg-gray-800/30 transition-colors">
+                            <td class="p-4 font-mono text-xs text-gray-400">
+                                {{ item.fecha_creacion.strftime('%Y-%m-%d') if item.fecha_creacion else 'N/A' }}
+                            </td>
+                            <td class="p-4 font-semibold text-white">{{ item.nombre }}</td>
+                            <td class="p-4">
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                                    {% if item.proveedor %}
+                                        {{ item.proveedor.nombre }}
+                                    {% else %}
+                                        Sin Proveedor
+                                    {% endif %}
+                                </span>
+                            </td>
+                            <td class="p-4 text-center font-mono">{{ item.cantidad_total or 0 }}</td>
+                            <td class="p-4 text-right font-mono font-bold text-amber-400">
+                                ${{ "%.2f"|format(item.monto_pendiente or 0.0) }}
+                            </td>
+                            <td class="p-4 text-center">
+                                <form method="POST" action="{{ url_for('pagar_cuenta', id=item.id) }}">
+                                    <button type="submit"
+                                        class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all shadow-md">
+                                        Marcar Pagado
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="p-8 text-center text-gray-500 font-medium">
+                                No hay cuentas pendientes por pagar.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla Historial de Pagos Realizados -->
+    <div class="space-y-3 pt-4">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+            <span>Historial de Pagos Realizados</span>
+        </h3>
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead>
+                        <tr class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            <th class="p-4">Fecha de Pago</th>
+                            <th class="p-4">Producto</th>
+                            <th class="p-4">Proveedor</th>
+                            <th class="p-4 text-right">Monto Pagado</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/60 text-gray-300">
+                        {% for h in historial %}
+                        <tr class="hover:bg-gray-800/30 transition-colors">
+                            <td class="p-4 font-mono text-xs text-gray-400">
+                                {{ h.fecha_pago.strftime('%Y-%m-%d %H:%M') }}
+                            </td>
+                            <td class="p-4 font-semibold text-white">{{ h.producto_nombre }}</td>
+                            <td class="p-4 text-gray-400">{{ h.proveedor_nombre }}</td>
+                            <td class="p-4 text-right font-mono font-bold text-emerald-400">
+                                ${{ "%.2f"|format(h.monto_pagado) }}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" class="p-6 text-center text-gray-500 font-medium">
+                                Aún no se han registrado pagos en el historial.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 

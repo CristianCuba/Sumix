@@ -59,6 +59,9 @@ class Producto(db.Model):
     precio_costo = db.Column(db.Float, default=0.0)
     precio_venta = db.Column(db.Float, default=0.0)
     
+    # Control de Caducidad
+    fecha_vencimiento = db.Column(db.Date, nullable=True)
+    
     # Relación con Proveedor (Corregida para evitar choques)
     proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedores.id'), nullable=True)
     proveedor = db.relationship('Proveedor', backref=db.backref('productos', lazy=True))
@@ -91,18 +94,6 @@ class Usuario(db.Model):
     password = db.Column(db.String(100), nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
     rol = db.Column(db.String(20), default='dependiente')
-
-
-class Movimiento(db.Model):
-    __tablename__ = 'movimientos'
-    id = db.Column(db.Integer, primary_key=True)
-    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
-    tipo_movimiento = db.Column(db.String(20), nullable=False) # 'entrada', 'salida', 'traslado'
-    concepto = db.Column(db.String(50), nullable=False) # 'Compra', 'Venta', 'Merma', 'Traslado'
-    cantidad = db.Column(db.Float, nullable=False)
-    origen = db.Column(db.String(50), nullable=True)
-    destino = db.Column(db.String(50), nullable=True)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 class CierreDia(db.Model):
@@ -151,10 +142,47 @@ class ConceptoMovimiento(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(100), nullable=False)
     tipo_id = db.Column(db.Integer, db.ForeignKey('tipos_operacion.id'), nullable=False)
+
+class HistorialPago(db.Model):
+    __tablename__ = 'historial_pagos'
+    id = db.Column(db.Integer, primary_key=True)
+    producto_nombre = db.Column(db.String(100), nullable=False)
+    proveedor_nombre = db.Column(db.String(100), nullable=True)
+    monto_pagado = db.Column(db.Float, nullable=False)
+    fecha_pago = db.Column(db.DateTime, default=datetime.utcnow)    
 # -----------------------------------------------------------------#
 # CONTROL DE RUTAS Y NAVEGACIÓN
 # -----------------------------------------------------------------#
 from flask import jsonify
+from datetime import date
+
+@app.context_processor
+def inject_today():
+    return {'hoy': date.today()}
+
+@app.route('/pagar_cuenta/<int:id>', methods=['POST'])
+def pagar_cuenta(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    producto = Producto.query.get_or_404(id)
+    
+    if producto.estado_pago == 'Pendiente':
+        # 1. Crear el registro en el historial
+        nuevo_historial = HistorialPago(
+            producto_nombre=producto.nombre,
+            proveedor_nombre=producto.proveedor.nombre if producto.proveedor else 'Sin Proveedor',
+            monto_pagado=producto.monto_pendiente
+        )
+        db.session.add(nuevo_historial)
+
+        # 2. Actualizar el producto a Pagado
+        producto.estado_pago = 'Pagado'
+        producto.monto_pendiente = 0.0
+
+        db.session.commit()
+
+    return redirect(url_for('cuentas_por_pagar'))
 
 @app.route('/api/tipos_operacion', methods=['GET'])
 def api_tipos_operacion():
@@ -391,30 +419,88 @@ def vista_cierre():
     return render_template('cierre.html', productos=productos)
 
 
-@app.route('/admin')
+import json
+
+@app.route('/admin') 
 def vista_admin():
-    # Validar sesión de administrador
     if 'user' not in session or session.get('rol') != 'admin':
         return redirect(url_for('login'))
 
-    # 1. Obtener los tipos de operación creados dinámicamente
-    tipos_operaciones = TipoOperacion.query.all()
-    
-    # 2. Obtener la lista general de almacenes y productos
-    almacenes = Almacen.query.all()
     productos = Producto.query.all()
+    almacenes = Almacen.query.all()
+    proveedores = Proveedor.query.all()
     
-    # 3. Obtener todos los conceptos registrados
-    conceptos = ConceptoMovimiento.query.all()
 
-    # Renderizar la vista pasando todas las variables necesarias al template
+    # Mapeo de existencias por producto y almacén
+    # Estructura: { producto_id: { almacen_id: cantidad } }
+    stock_map = {}
+    
+    # Recorremos todas las existencias registradas
+    registros_stock = StockAlmacen.query.all()
+    for s in registros_stock:
+        if s.producto_id not in stock_map:
+            stock_map[s.producto_id] = {}
+        stock_map[s.producto_id][s.almacen_id] = s.cantidad
+
     return render_template(
-        'admin_almacenes.html',
-        tipos_operaciones=tipos_operaciones,
-        almacenes=almacenes,
+        'admin_almacenes.html', # Tu plantilla
         productos=productos,
-        conceptos=conceptos
+        almacenes=almacenes,
+        proveedores= proveedores,
+        stock_map=json.dumps(stock_map) # Serializado de forma segura a JSON
     )
+
+
+@app.route('/trasladar_stock', methods=['POST'])
+def trasladar_stock():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    producto_id = request.form.get('producto_id', type=int)
+    origen_id = request.form.get('almacen_origen_id', type=int)
+    destino_id = request.form.get('almacen_destino_id', type=int)
+    cantidad = request.form.get('cantidad', type=float, default=0.0)
+
+    # Validaciones básicas de entrada
+    if not producto_id or not origen_id or not destino_id or cantidad <= 0:
+        return redirect(url_for('vista_admin'))
+
+    if origen_id == destino_id:
+        return redirect(url_for('vista_admin'))
+
+    # 1. Buscar stock en el almacén de origen
+    stock_origen = StockAlmacen.query.filter_by(
+        producto_id=producto_id, 
+        almacen_id=origen_id
+    ).first()
+
+    # Verificar que exista suficiente cantidad
+    if not stock_origen or stock_origen.cantidad < cantidad:
+        return redirect(url_for('vista_admin'))
+
+    # 2. Descontar del origen
+    stock_origen.cantidad -= cantidad
+
+    # 3. Sumar o crear el registro en el almacén de destino
+    stock_destino = StockAlmacen.query.filter_by(
+        producto_id=producto_id, 
+        almacen_id=destino_id
+    ).first()
+
+    if stock_destino:
+        stock_destino.cantidad += cantidad
+    else:
+        stock_destino = StockAlmacen(
+            producto_id=producto_id,
+            almacen_id=destino_id,
+            cantidad=cantidad
+        )
+        db.session.add(stock_destino)
+
+    db.session.commit()
+    return redirect(url_for('vista_admin'))
+
+from datetime import datetime
 
 @app.route('/guardar_producto', methods=['POST'])
 def guardar_producto():
@@ -425,18 +511,38 @@ def guardar_producto():
     proveedor_id = request.form.get('proveedor_id')  # ID del select de proveedores
     almacen_id = request.form.get('almacen_id')      # ID del select de almacenes
     cantidad_inicial = float(request.form.get('cantidad', 0))
+    
+    # --- CAPTURAR Y PARSEAR FECHA DE VENCIMIENTO ---
+    fecha_venc_str = request.form.get('fecha_vencimiento')
+    fecha_vencimiento = None
+    if fecha_venc_str:
+        try:
+            fecha_vencimiento = datetime.strptime(fecha_venc_str, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_vencimiento = None
 
-    # 2. Crear el Producto
+    # CAPTURAR EL ESTADO DE PAGO DESDE EL FORMULARIO
+    estado_pago = request.form.get('estado_pago', 'Pagado') 
+
+    # Calcular monto pendiente
+    monto_pendiente = 0.0
+    if estado_pago == 'Pendiente':
+        monto_pendiente = precio_costo * cantidad_inicial
+
+    # 2. Crear el Producto con todos los campos
     nuevo_producto = Producto(
         nombre=nombre,
         precio_costo=precio_costo,
         precio_venta=precio_venta,
-        proveedor_id=int(proveedor_id) if proveedor_id else None
+        proveedor_id=int(proveedor_id) if proveedor_id else None,
+        estado_pago=estado_pago,             
+        monto_pendiente=monto_pendiente,
+        fecha_vencimiento=fecha_vencimiento  # <-- CAMPO AGREGADO AQUÍ
     )
     db.session.add(nuevo_producto)
     db.session.flush()  # Para obtener el ID generado del nuevo_producto
 
-    # 3. Crear el registro en StockAlmacen (VINCULA EL ALMACÉN Y LA CANTIDAD)
+    # 3. Crear el registro en StockAlmacen
     if almacen_id:
         nuevo_stock = StockAlmacen(
             producto_id=nuevo_producto.id,
@@ -599,6 +705,8 @@ def obtener_detalle_cierre(id_cierre):
 # CUENTAS POR PAGAR
 # -----------------------------------------------------------------#
 
+import urllib.parse
+
 @app.route('/admin/cuentas-por-pagar')
 @app.route('/cuentas-por-pagar')
 def cuentas_por_pagar():
@@ -606,40 +714,45 @@ def cuentas_por_pagar():
         return redirect(url_for('login'))
 
     proveedor_filtro = request.args.get('proveedor', '')
-    
-    # Obtener proveedores con deudas pendientes
-    proveedores_query = db.session.query(Producto.proveedor).filter_by(estado_pago='Pendiente').distinct().all()
-    lista_proveedores = [p[0] for p in proveedores_query if p[0]]
-    
-    # Filtrar por proveedor si aplica
+
+    todos_los_proveedores = Proveedor.query.all()
     query = Producto.query.filter_by(estado_pago='Pendiente')
-    if proveedor_filtro:
-        query = query.filter_by(proveedor=proveedor_filtro)
-        
+
+    proveedor_obj = None
+    if proveedor_filtro and proveedor_filtro.isdigit():
+        query = query.filter_by(proveedor_id=int(proveedor_filtro))
+        proveedor_obj = Proveedor.query.get(int(proveedor_filtro))
+
     cuentas_pendientes = query.all()
-    total_adeudado = sum(item.monto_pendiente for item in cuentas_pendientes)
-    
+    total_adeudado = sum(item.monto_pendiente for item in cuentas_pendientes if item.monto_pendiente)
+
+    # Cargar los últimos 20 pagos del historial
+    historial = HistorialPago.query.order_by(HistorialPago.fecha_pago.desc()).limit(20).all()
+
+    # Generar el mensaje de WhatsApp si hay un proveedor seleccionado
+    mensaje_wa = ""
+    if proveedor_obj and cuentas_pendientes:
+        lineas = [f"*RESUMEN DE CUENTA PENDIENTE*", f"*Proveedor:* {proveedor_obj.nombre}\n"]
+        for p in cuentas_pendientes:
+            cant = p.cantidad_total or 0
+            lineas.append(f"• {p.nombre} ({cant} unid.) -> *${'%.2f' % p.monto_pendiente}*")
+        
+        lineas.append(f"\n*TOTAL ADEUDADO:* *${'%.2f' % total_adeudado}*")
+        lineas.append(" Quedo al pendiente para realizar el pago. ¡Gracias!")
+        
+        texto_completo = "\n".join(lineas)
+        mensaje_wa = urllib.parse.quote(texto_completo)
+
     return render_template(
         'cuentas_por_pagar.html',
         cuentas=cuentas_pendientes,
-        proveedores=lista_proveedores,
-        proveedor_seleccionado=proveedor_filtro,
-        total_adeudado=total_adeudado
+        proveedores=todos_los_proveedores,
+        proveedor_seleccionado=str(proveedor_filtro),
+        proveedor_obj=proveedor_obj,
+        total_adeudado=total_adeudado,
+        historial=historial,
+        mensaje_wa=mensaje_wa
     )
-
-
-@app.route('/pagar-cuenta/<int:id>', methods=['POST'])
-def pagar_cuenta(id):
-    if 'user' not in session or session.get('rol') != 'admin':
-        return redirect(url_for('login'))
-
-    producto = Producto.query.get_or_404(id)
-    producto.estado_pago = 'Pagado'
-    producto.monto_pendiente = 0.0
-    db.session.commit()
-    flash(f'Cuenta abonada/marcada como pagada para {producto.nombre}', 'info')
-    return redirect(url_for('cuentas_por_pagar'))
-
 
 # -----------------------------------------------------------------#
 # GESTIÓN DE USUARIOS
@@ -700,114 +813,6 @@ def eliminar_usuario(id):
 # -----------------------------------------------------------------#
 # MOVIMIENTOS E INVENTARIO
 # -----------------------------------------------------------------#
-
-@app.route('/admin/producto/movimiento', methods=['POST'])
-def registrar_movimiento():
-    print("\n--- [DEBUG] DATOS RECIBIDOS DEL FORMULARIO ---")
-    for key, value in request.form.items():
-        print(f"  {key}: {repr(value)}")
-    print("---------------------------------------------\n")
-
-    if 'user' not in session or session.get('rol') != 'admin':
-        return redirect(url_for('login'))
-
-    producto_id = int(request.form.get('producto_id'))
-    tipo_op_id = request.form.get('tipo_operacion', '')  # Llega el ID de TipoOperacion
-    concepto = request.form.get('concepto')
-    cantidad = float(request.form.get('cantidad') or 0.0)
-
-    if cantidad <= 0:
-        flash("La cantidad debe ser mayor a cero.", "error")
-        return redirect(url_for('vista_admin'))
-
-    producto = Producto.query.get_or_404(producto_id)
-
-    # 1. Obtener la entidad de TipoOperacion para extraer su 'codigo' ('traslado', 'entrada', 'salida')
-    tipo_operacion_obj = TipoOperacion.query.get(tipo_op_id) if tipo_op_id else None
-
-    if not tipo_operacion_obj:
-        print("ERR: No se encontró TipoOperacion con ID:", tipo_op_id)
-        flash("Tipo de operación inválido.", "error")
-        return redirect(url_for('vista_admin'))
-
-    tipo_op = tipo_operacion_obj.codigo.lower().strip()
-    print(f"--> CÓDIGO DETECTADO: '{tipo_op}'")  # REVISAR ESTE PRINT EN LA CONSOLA
-
-    def get_or_create_stock(almacen_id):
-        stock = StockAlmacen.query.filter_by(
-            producto_id=producto.id, 
-            almacen_id=almacen_id
-        ).first()
-        if not stock:
-            stock = StockAlmacen(producto_id=producto.id, almacen_id=almacen_id, cantidad=0.0)
-            db.session.add(stock)
-        return stock
-
-    origen_nombre = None
-    destino_nombre = None
-
-    if tipo_op == 'entrada':
-        destino_id = request.form.get('ubicacion_destino')
-        if destino_id:
-            almacen_dest = Almacen.query.get(int(destino_id))
-            if almacen_dest:
-                stk_destino = get_or_create_stock(almacen_dest.id)
-                stk_destino.cantidad += cantidad
-                destino_nombre = almacen_dest.nombre
-
-    elif tipo_op == 'salida':
-        origen_id = request.form.get('ubicacion_origen')
-        destino_input = request.form.get('ubicacion_destino')
-
-        if origen_id:
-            almacen_orig = Almacen.query.get(int(origen_id))
-            if almacen_orig:
-                stk_origen = get_or_create_stock(almacen_orig.id)
-                stk_origen.cantidad = max(0.0, stk_origen.cantidad - cantidad)
-                origen_nombre = almacen_orig.nombre
-
-        if destino_input:
-            if destino_input.isdigit():
-                almacen_dest = Almacen.query.get(int(destino_input))
-                destino_nombre = almacen_dest.nombre if almacen_dest else destino_input
-            else:
-                destino_nombre = destino_input
-
-    elif tipo_op == 'traslado':
-        origen_id = request.form.get('ubicacion_origen')
-        destino_id = request.form.get('ubicacion_destino')
-
-        if origen_id and destino_id and origen_id != destino_id:
-            almacen_orig = Almacen.query.get(int(origen_id))
-            almacen_dest = Almacen.query.get(int(destino_id))
-
-            if almacen_orig and almacen_dest:
-                stk_origen = get_or_create_stock(almacen_orig.id)
-                stk_destino = get_or_create_stock(almacen_dest.id)
-
-                # Descontar del origen y sumar exacto al destino
-                stk_origen.cantidad = max(0.0, stk_origen.cantidad - cantidad)
-                stk_destino.cantidad += cantidad
-
-                origen_nombre = almacen_orig.nombre
-                destino_nombre = almacen_dest.nombre
-
-    # 2. Registrar trazabilidad del movimiento
-    log_mov = Movimiento(
-        producto_id=producto.id,
-        tipo_movimiento=tipo_op,
-        concepto=concepto,
-        cantidad=cantidad,
-        origen=origen_nombre,
-        destino=destino_nombre
-    )
-
-    db.session.add(log_mov)
-    db.session.commit()
-
-    flash("Movimiento registrado con éxito.", "info")
-    return redirect(url_for('vista_admin'))
-
 
 @app.route('/api/conceptos/<int:tipo_id>', methods=['GET'])
 def obtener_conceptos_por_tipo(tipo_id):

@@ -5,12 +5,32 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SUMIX</title>
+    
+    <!-- CDN Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="/static/js/mains.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Google Fonts: Inter para un look moderno -->
+    
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
+    
+    <!-- Cargar archivo JS externo -->
+    <script src="{{ url_for('static', filename='js/mains.js') }}"></script>
+
+    <!-- Inicializar datos de Flask -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            // Envolver en comillas para que JS siempre lo interprete como String limpio
+            const rawData = '{{ stock_map | safe if stock_map else "{}" }}';
+            
+            try {
+                const datos = JSON.parse(rawData);
+                cargarMapaStock(datos);
+            } catch (e) {
+                console.error("Error al parsear stock_map:", e);
+                cargarMapaStock({});
+            }
+        });
+    </script>
 </head>
 
 <body class="h-full bg-[#121316] text-gray-200 flex overflow-hidden">

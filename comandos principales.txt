@@ -1,0 +1,35 @@
+TRAER DESE GIT
+git pull
+
+para subir a git
+Para actualizar tu repositorio remoto en GitHub con todos los cambios recientes que hemos hecho en el proyecto, abre la terminal en VS Code (asegúrate de estar en la raíz de tu proyecto C:\sumix) y sigue estos tres sencillos comandos:
+1. Preparar y rastrear todos los cambios
+Bash
+
+git add .
+
+2. Guardar el estado local con un mensaje claro
+Bash
+
+git commit -m "Agregar modulo de gestion de fecha de vencimiento en productos"
+
+3. Subir las actualizaciones a GitHub
+Bash
+
+git push
+
+En caso de que se presente alguna eventualidad:
+
+    Si git push pide especificar la rama:
+    Ejecuta:
+    Bash
+
+    git push origin main
+
+    (O master, según el nombre de tu rama principal).
+
+    Para confirmar que el estado local quedó limpio:
+    Puedes verificar el estado ejecutando:
+    Bash
+
+    git status

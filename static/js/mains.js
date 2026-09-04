@@ -1,133 +1,4 @@
-// ==========================================
-// MODAL DE MOVIMIENTOS E INVENTARIO
-// ==========================================
-
-// Diccionario de conceptos de respaldo (fallback por si falla la API)
-const conceptosFallback = {
-    'ENTRADA': ['Compra de Proveedor', 'Ajuste de Inventario (Entrada)', 'Devolución de Cliente', 'Mercancía Inicial'],
-    'SALIDA': ['Ajuste por Merma/Pérdida', 'Consumo Interno', 'Devolución a Proveedor', 'Ajuste de Inventario (Salida)'],
-    'TRANSFERENCIA': ['Traslado a Área de Venta', 'Traslado entre Almacenes', 'Reubicación Interna']
-};// Diccionario de conceptos de respaldo (fallback)
-function abrirModalMovimiento(btn) {
-    const id = btn.dataset.id;
-    const descripcion = btn.dataset.descripcion;
-
-    const inputId = document.getElementById('mov-producto-id') || document.getElementById('producto_id_movimiento');
-    const labelNombre = document.getElementById('mov-producto-nombre') || document.getElementById('nombre_producto_movimiento');
-    const modal = document.getElementById('modal-movimiento') || document.getElementById('modalMovimiento');
-
-    if (inputId) inputId.value = id;
-    if (labelNombre) labelNombre.textContent = descripcion || 'Sin descripción';
-    
-    if (modal) {
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-    } else {
-        console.error("No se encontró el modal de movimiento.");
-    }
-
-    seleccionarTipoOperacion();
-}
-
-function cerrarModalMovimiento() {
-    const modal = document.getElementById('modal-movimiento') || document.getElementById('modalMovimiento');
-    if (modal) {
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-    }
-}
-
-async function seleccionarTipoOperacion() {
-    const tipoSelect = document.getElementById('tipo_operacion');
-    const conceptoSelect = document.getElementById('concepto');
-    const blockOrigen = document.getElementById('block-origen');
-    const blockDestino = document.getElementById('block-destino');
-
-    if (!tipoSelect || !conceptoSelect) return;
-
-    const tipoId = tipoSelect.value;
-
-    if (!tipoId) {
-        conceptoSelect.innerHTML = '<option value="">-- Selecciona un tipo primero --</option>';
-        if (blockOrigen) blockOrigen.style.display = 'block';
-        if (blockDestino) blockDestino.style.display = 'block';
-        return;
-    }
-
-    const selectedOption = tipoSelect.options[tipoSelect.selectedIndex];
-    const tipoTexto = selectedOption ? selectedOption.textContent.toUpperCase() : '';
-    
-    // 1. Obtener valores de los atributos HTML (data-origen / data-destino)
-    const attrOrigen = selectedOption.getAttribute('data-origen');
-    const attrDestino = selectedOption.getAttribute('data-destino');
-
-    // 2. Lógica para determinar si se muestra u oculta
-    let mostrarOrigen = true;
-    let mostrarDestino = true;
-
-    if (attrOrigen !== null && attrDestino !== null) {
-        // Usa los atributos del modelo si existen
-        mostrarOrigen = (attrOrigen === 'true');
-        mostrarDestino = (attrDestino === 'true');
-    } else {
-        // Fallback leyendo el texto de la opción seleccionada
-        if (tipoTexto.includes('ENTRADA') || tipoTexto.includes('COMPRA')) {
-            mostrarOrigen = false;
-            mostrarDestino = true;
-        } else if (tipoTexto.includes('SALIDA') || tipoTexto.includes('MERMA')) {
-            mostrarOrigen = true;
-            mostrarDestino = false;
-        } else { // TRASLADO / TRANSFERENCIA
-            mostrarOrigen = true;
-            mostrarDestino = true;
-        }
-    }
-
-    // Aplicar estilos a los bloques
-    if (blockOrigen) blockOrigen.style.display = mostrarOrigen ? 'block' : 'none';
-    if (blockDestino) blockDestino.style.display = mostrarDestino ? 'block' : 'none';
-
-    // 3. Cargar conceptos dinámicos desde la API
-    conceptoSelect.innerHTML = '<option value="">Cargando conceptos...</option>';
-
-    try {
-        const response = await fetch(`/api/conceptos/${tipoId}`);
-        if (!response.ok) throw new Error('Error al consultar conceptos');
-        
-        const conceptos = await response.json();
-        conceptoSelect.innerHTML = '';
-
-        if (conceptos.length === 0) {
-            conceptoSelect.innerHTML = '<option value="">Sin conceptos disponibles</option>';
-        } else {
-            conceptos.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.nombre;
-                opt.textContent = c.nombre;
-                conceptoSelect.appendChild(opt);
-            });
-        }
-    } catch (error) {
-        console.error("Error al cargar conceptos:", error);
-        conceptoSelect.innerHTML = '<option value="">Error al cargar conceptos</option>';
-    }
-}
-function cargarConceptosFallback(selectElement, clave) {
-    const opciones = conceptosFallback[clave] || [];
-    selectElement.innerHTML = '';
-    
-    if (opciones.length === 0) {
-        selectElement.innerHTML = '<option value="">-- Sin conceptos disponibles --</option>';
-    } else {
-        opciones.forEach(c => {
-            const opt = document.createElement('option');
-            opt.value = c;
-            opt.textContent = c;
-            selectElement.appendChild(opt);
-        });
-    }
-}
-
+cuen
 // ==========================================
 // MODAL DE PRODUCTOS
 // ==========================================
@@ -147,6 +18,58 @@ function cerrarModalProducto() {
     }
 }
 
+
+// static/js/mains.js
+
+/// main.js - Declaraciones al inicio
+var mapaStock = {};
+var productoSeleccionadoId = null;
+
+function cargarMapaStock(datosStock) {
+    mapaStock = datosStock || {};
+}
+
+function abrirModalTraslado(id, nombre) {
+    productoSeleccionadoId = id;
+
+    const campoId = document.getElementById('modalProductoId');
+    const campoNombre = document.getElementById('modalProductoNombre');
+    const modal = document.getElementById('modalTraslado');
+
+    if (campoId) campoId.value = id;
+    if (campoNombre) campoNombre.textContent = 'Producto: ' + nombre;
+    if (modal) modal.classList.remove('hidden');
+
+    actualizarStockDisponible();
+}
+
+function actualizarStockDisponible() {
+    // Control de seguridad: Si no hay ID seleccionado aún, no hace nada
+    if (!productoSeleccionadoId) return;
+
+    const selectorOrigen = document.getElementById('modalAlmacenOrigen');
+    const textoStock = document.getElementById('stockDisponibleText');
+
+    if (!selectorOrigen || !textoStock) return;
+
+    const almacenId = selectorOrigen.value;
+    const stockProducto = mapaStock[productoSeleccionadoId] || {};
+    const cantidadDisponible = stockProducto[almacenId] || 0;
+
+    textoStock.textContent = `Disponible: ${cantidadDisponible}`;
+
+    if (cantidadDisponible <= 0) {
+        textoStock.className = "text-xs font-mono font-bold text-rose-500";
+    } else {
+        textoStock.className = "text-xs font-mono font-bold text-emerald-400";
+    }
+}
+
+function cerrarModalTraslado() {
+    const modal = document.getElementById('modalTraslado');
+    if (modal) modal.classList.add('hidden');
+    productoSeleccionadoId = null;
+}
 
 // ==========================================
 // CONTROL DEL CIERRE DE DÍA Y ARQUEO DE CAJA
@@ -372,38 +295,38 @@ function actualizarNombreArchivo(input) {
         label.textContent = "Seleccionar archivo .db";
     }
 }
+function calcularSugerenciaVenta() {
+    const inputCosto = document.getElementById('precio_costo');
+    const inputVenta = document.getElementById('precio_venta');
+    const textoSugerencia = document.getElementById('sugerencia_texto');
 
+    if (!inputCosto || !inputVenta) return;
+
+    const costo = parseFloat(inputCosto.value) || 0;
+
+    if (costo > 0) {
+        const sugerido = (costo * 1.30).toFixed(2);
+        
+        // Asigna la sugerencia si el campo de venta está vacío o es 0
+        if (!inputVenta.value || parseFloat(inputVenta.value) === 0) {
+            inputVenta.value = sugerido;
+        }
+
+        if (textoSugerencia) {
+            textoSugerencia.textContent = `Sugerido (+30%): $${sugerido}`;
+        }
+    } else {
+        if (textoSugerencia) {
+            textoSugerencia.textContent = '';
+        }
+    }
+}
 
 // ==========================================
 // INICIALIZACIÓN DE EVENTOS AL CARGAR EL DOM
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Sugerencia de margen +30% en creación de producto
-    const inputCosto = document.getElementById('precio_costo');
-    const inputVenta = document.getElementById('precio_venta');
-    const textoSugerencia = document.getElementById('sugerencia_texto');
-
-    if (inputCosto && inputVenta) {
-        inputCosto.addEventListener('input', () => {
-            const costo = parseFloat(inputCosto.value) || 0;
-
-            if (costo > 0) {
-                const sugerido = (costo * 1.30).toFixed(2);
-                if (!inputVenta.value) {
-                    inputVenta.value = sugerido;
-                }
-                if (textoSugerencia) {
-                    textoSugerencia.textContent = `Sugerido (+30%): $${sugerido}`;
-                }
-            } else {
-                if (textoSugerencia) {
-                    textoSugerencia.textContent = '';
-                }
-            }
-        });
-    }
-
-    // 2. Escuchador para el buscador de productos en cierre
+       // 2. Escuchador para el buscador de productos en cierre
     const inputBuscador = document.getElementById('buscador');
     if (inputBuscador) {
         inputBuscador.addEventListener('keyup', filtrarProductos);
