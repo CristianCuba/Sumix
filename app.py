@@ -421,6 +421,9 @@ def vista_cierre():
 
 import json
 
+from flask import render_template, redirect, url_for, session
+import json
+
 @app.route('/admin') 
 def vista_admin():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -429,25 +432,44 @@ def vista_admin():
     productos = Producto.query.all()
     almacenes = Almacen.query.all()
     proveedores = Proveedor.query.all()
-    
 
-    # Mapeo de existencias por producto y almacén
-    # Estructura: { producto_id: { almacen_id: cantidad } }
+    # 1. Mapeo de existencias por producto y almacén
     stock_map = {}
-    
-    # Recorremos todas las existencias registradas
     registros_stock = StockAlmacen.query.all()
     for s in registros_stock:
         if s.producto_id not in stock_map:
             stock_map[s.producto_id] = {}
         stock_map[s.producto_id][s.almacen_id] = s.cantidad
 
+    # 2. CÁLCULOS FINANCIEROS Y REPORTES
+    total_invertido = 0.0
+    total_venta_estimada = 0.0
+
+    for prod in productos:
+        # Sumamos la cantidad de este producto en todos los almacenes registrados en stock_map
+        cantidades_almacen = stock_map.get(prod.id, {}).values()
+        stock_total_producto = sum(cantidades_almacen)
+        
+        # Multiplicamos por sus respectivos precios
+        costo_unitario = prod.precio_costo or 0.0
+        venta_unitaria = prod.precio_venta or 0.0
+
+        total_invertido += stock_total_producto * costo_unitario
+        total_venta_estimada += stock_total_producto * venta_unitaria
+
+    # Ganancia proyectada en dinero
+    ganancia_potencial = total_venta_estimada - total_invertido
+
+    # 3. Renderizado de plantilla con las nuevas variables
     return render_template(
-        'admin_almacenes.html', # Tu plantilla
+        'admin_almacenes.html',
         productos=productos,
         almacenes=almacenes,
-        proveedores= proveedores,
-        stock_map=json.dumps(stock_map) # Serializado de forma segura a JSON
+        proveedores=proveedores,
+        stock_map=json.dumps(stock_map),
+        total_invertido=total_invertido,
+        total_venta_estimada=total_venta_estimada,
+        ganancia_potencial=ganancia_potencial
     )
 
 

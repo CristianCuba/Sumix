@@ -10,6 +10,52 @@
             <p class="text-sm text-gray-400 mt-0.5">Control global de existencias, precios de costo y proveedores
             </p>
         </div>
+        <!-- REPORTES FINANCIEROS DE INVENTARIO -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    
+    <!-- Inversión total (Costo) -->
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inversión en Stock</p>
+            <h4 class="text-2xl font-bold text-white font-mono mt-1">
+                ${{ "%.2f"|format(total_invertido) }}
+            </h4>
+            <p class="text-xs text-gray-500 mt-1">Costo total acumulado</p>
+        </div>
+        <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+    </div>
+
+    <!-- Valor estimado de venta -->
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Valor Estimado Venta</p>
+            <h4 class="text-2xl font-bold text-emerald-400 font-mono mt-1">
+                ${{ "%.2f"|format(total_venta_estimada) }}
+            </h4>
+            <p class="text-xs text-gray-500 mt-1">Retorno total esperado</p>
+        </div>
+        <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+        </div>
+    </div>
+
+    <!-- Ganancia Proyectada -->
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ganancia Proyectada</p>
+            <h4 class="text-2xl font-bold text-orange-400 font-mono mt-1">
+                ${{ "%.2f"|format(ganancia_potencial) }}
+            </h4>
+            <p class="text-xs text-gray-500 mt-1">Margen bruto esperado</p>
+        </div>
+        <div class="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+        </div>
+    </div>
+
+</div>
         <button onclick="abrirModalProducto()"
             class="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition flex items-center gap-2 text-sm shadow-lg shadow-orange-600/20 active:scale-95">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
