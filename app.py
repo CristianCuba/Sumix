@@ -742,6 +742,10 @@ def editar_producto(id):
     
     proveedor_id = request.form.get('proveedor_id')
     producto.proveedor_id = int(proveedor_id) if proveedor_id else None
+    
+    propietario_id = request.form.get('propietario_id')
+    producto.propietario_id = int(propietario_id) if propietario_id else None
+
 
     # Parsear Fecha de Vencimiento
     fecha_venc_str = request.form.get('fecha_vencimiento')

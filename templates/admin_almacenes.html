@@ -2,102 +2,109 @@
 
 {% block content %}
 
-    <header class="p-6 pb-2 flex justify-between items-center">
+<header class="p-6 space-y-6">
+    <!-- 1. Título de la página + Botón Acción -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-tight">Consolidado de Almacenes <span
-                    class="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">Administrador</span>
+            <h1 class="text-2xl font-bold text-white tracking-tight flex items-center gap-2">
+                Consolidado de Almacenes
+                <span class="text-xs font-medium px-2.5 py-1 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                    Administrador
+                </span>
             </h1>
-            <p class="text-sm text-gray-400 mt-0.5">Control global de existencias, precios de costo y proveedores
+            <p class="text-sm text-gray-400 mt-0.5">
+                Control global de existencias, precios de costo y proveedores
             </p>
         </div>
-        <!-- REPORTES FINANCIEROS DE INVENTARIO -->
-<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-    
-    <!-- Inversión total (Costo) -->
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
-        <div>
-            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inversión en Stock</p>
-            <h4 class="text-2xl font-bold text-white font-mono mt-1">
-                ${{ "%.2f"|format(total_invertido) }}
-            </h4>
-            <p class="text-xs text-gray-500 mt-1">Costo total acumulado</p>
-        </div>
-        <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        </div>
-    </div>
 
-    <!-- Valor estimado de venta -->
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
-        <div>
-            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Valor Estimado Venta</p>
-            <h4 class="text-2xl font-bold text-emerald-400 font-mono mt-1">
-                ${{ "%.2f"|format(total_venta_estimada) }}
-            </h4>
-            <p class="text-xs text-gray-500 mt-1">Retorno total esperado</p>
-        </div>
-        <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-        </div>
-    </div>
-
-    <!-- Ganancia Proyectada -->
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
-        <div>
-            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ganancia Proyectada</p>
-            <h4 class="text-2xl font-bold text-orange-400 font-mono mt-1">
-                ${{ "%.2f"|format(ganancia_potencial) }}
-            </h4>
-            <p class="text-xs text-gray-500 mt-1">Margen bruto esperado</p>
-        </div>
-        <div class="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-        </div>
-    </div>
-
-</div>
         <button onclick="abrirModalProducto()"
-            class="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition flex items-center gap-2 text-sm shadow-lg shadow-orange-600/20 active:scale-95">
+            class="px-4 py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-2 text-sm shadow-lg shadow-orange-600/20 active:scale-95 shrink-0">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
             <span>Nuevo Producto</span>
         </button>
-        <!-- Al final de tu plantilla HTML, después de cargar main.js -->
-    <script>
-        // Le pasas a la función de main.js los datos dict de Flask
-        cargarMapaStock('{{ mapa_stock_json | tojson | safe if mapa_stock_json else "{}" }}');
-    </script>
-<!-- Filtro Dinámico por Propietario -->
-<div class="flex flex-wrap gap-2 mb-6">
-    <a href="?propietario_id=todos"
-        class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == 'todos' %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
-        Todos los Propietarios
-    </a>
+    </div>
 
-    {% for prop in propietarios %}
-    <a href="?propietario_id={{ prop.id }}"
-        class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == prop.id|string %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
-        {{ prop.nombre }}
-    </a>
-    {% endfor %}
-</div>
-    </header>
-    <!-- Barra de Filtro / Búsqueda -->
-    <div class="mb-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div class="relative w-full sm:w-80">
+    <!-- 2. Tarjetas Financieras (3 columnas) -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Inversión total (Costo) -->
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Inversión en Stock</p>
+                <h4 class="text-2xl font-bold text-white font-mono mt-1">
+                    ${{ "%.2f"|format(total_invertido) }}
+                </h4>
+                <p class="text-xs text-gray-500 mt-1">Costo total acumulado</p>
+            </div>
+            <div class="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl text-blue-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </div>
+        </div>
+
+        <!-- Valor estimado de venta -->
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Valor Estimado Venta</p>
+                <h4 class="text-2xl font-bold text-emerald-400 font-mono mt-1">
+                    ${{ "%.2f"|format(total_venta_estimada) }}
+                </h4>
+                <p class="text-xs text-gray-500 mt-1">Retorno total esperado</p>
+            </div>
+            <div class="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+            </div>
+        </div>
+
+        <!-- Ganancia Proyectada -->
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl flex items-center justify-between">
+            <div>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Ganancia Proyectada</p>
+                <h4 class="text-2xl font-bold text-orange-400 font-mono mt-1">
+                    ${{ "%.2f"|format(ganancia_potencial) }}
+                </h4>
+                <p class="text-xs text-gray-500 mt-1">Margen bruto esperado</p>
+            </div>
+            <div class="p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl text-orange-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Filtros y Búsqueda -->
+    <div class="flex flex-col md:flex-row gap-4 items-center justify-between pt-2">
+        <!-- Filtro Dinámico por Propietario -->
+        <div class="flex flex-wrap gap-2 w-full md:w-auto">
+            <a href="?propietario_id=todos"
+                class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == 'todos' %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
+                Todos los Propietarios
+            </a>
+
+            {% for prop in propietarios %}
+            <a href="?propietario_id={{ prop.id }}"
+                class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == prop.id|string %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
+                {{ prop.nombre }}
+            </a>
+            {% endfor %}
+        </div>
+
+        <!-- Barra de Búsqueda -->
+        <div class="relative w-full md:w-80">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
             </div>
             <input type="text" id="filtro-productos" onkeyup="filtrarTablaProductos()"
                 placeholder="Buscar por nombre o proveedor..."
                 class="w-full pl-9 pr-4 py-2 bg-[#121316] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 transition-all">
         </div>
+    </div>
+</header>
 
-</div>
+<script>
+    cargarMapaStock('{{ mapa_stock_json | tojson | safe if mapa_stock_json else "{}" }}');
+</script>
 
     <!-- Tabla Detallada de Inventario -->
     <section class="p-6 flex-1">
