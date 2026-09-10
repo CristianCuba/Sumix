@@ -38,6 +38,15 @@ class Proveedor(db.Model):
     # NOTA: La relación con Productos se declara dinámicamente en 'Producto'
     # mediante 'backref=db.backref("productos", lazy=True)'
 
+class Propietario(db.Model):
+    __tablename__ = 'propietarios'
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False, unique=True)
+    descripcion = db.Column(db.String(200))
+
+    # Relación para acceder a los productos desde el propietario
+    productos = db.relationship('Producto', backref='propietario', lazy=True)
+
 
 class StockAlmacen(db.Model):
     __tablename__ = 'stock_almacen'
@@ -54,6 +63,7 @@ class Producto(db.Model):
     codigo = db.Column(db.String(50), nullable=True)
     nombre = db.Column(db.String(100), nullable=False)
     unidad_medida = db.Column(db.String(20), default='unidad')
+    propietario_id = db.Column(db.Integer, db.ForeignKey('propietarios.id'), nullable=True)
     
     # Precios
     precio_costo = db.Column(db.Float, default=0.0)
@@ -189,6 +199,33 @@ def api_tipos_operacion():
     # Obtener todos los tipos de operación registrados
     tipos = TipoOperacion.query.all()
     return jsonify([{'id': t.id, 'nombre': t.nombre} for t in tipos])
+
+@app.route('/propietarios', methods=['GET', 'POST'])
+def gestionar_propietarios():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        descripcion = request.form.get('descripcion')
+        
+        if nombre:
+            nuevo = Propietario(nombre=nombre, descripcion=descripcion)
+            db.session.add(nuevo)
+            db.session.commit()
+            return redirect(url_for('gestionar_propietarios'))
+
+    lista_propietarios = Propietario.query.all()
+    return render_template('admin_gestion.html', propietarios=lista_propietarios)
+
+
+@app.route('/eliminar_propietario/<int:id>')
+def eliminar_propietario(id):
+    if 'user' in session and session.get('rol') == 'admin':
+        p = Propietario.query.get_or_404(id)
+        db.session.delete(p)
+        db.session.commit()
+    return redirect(url_for('gestionar_propietarios'))
 
 @app.route('/api/conceptos/<int:tipo_id>', methods=['GET'])
 def api_conceptos_por_tipo(tipo_id):
@@ -333,13 +370,15 @@ def vista_gestion_entidades():
     proveedores = Proveedor.query.all()
     tipos_operacion = TipoOperacion.query.all()
     conceptos = ConceptoMovimiento.query.all()
+    propietarios = Propietario.query.all()
 
     return render_template(
         'admin_gestion.html',
         almacenes=almacenes,
         proveedores=proveedores,
         tipos_operacion=tipos_operacion,
-        conceptos=conceptos
+        conceptos=conceptos,
+        propietarios = propietarios
     )
 
 @app.route('/admin/almacen/nuevo', methods=['POST'])
@@ -421,58 +460,65 @@ def vista_cierre():
 
 import json
 
-from flask import render_template, redirect, url_for, session
-import json
+from datetime import date
+from flask import redirect, render_template, request, session, url_for
 
-@app.route('/admin') 
+
+@app.route("/admin")
 def vista_admin():
-    if 'user' not in session or session.get('rol') != 'admin':
-        return redirect(url_for('login'))
+    if "user" not in session or session.get("rol") != "admin":
+        return redirect(url_for("login"))
 
-    productos = Producto.query.all()
+    # 1. Obtención de colecciones para tablas y selectores
     almacenes = Almacen.query.all()
     proveedores = Proveedor.query.all()
+    propietarios = Propietario.query.all()
+    tipos_operacion = TipoOperacion.query.all()
+    conceptos = ConceptoMovimiento.query.all()
 
-    # 1. Mapeo de existencias por producto y almacén
-    stock_map = {}
-    registros_stock = StockAlmacen.query.all()
-    for s in registros_stock:
-        if s.producto_id not in stock_map:
-            stock_map[s.producto_id] = {}
-        stock_map[s.producto_id][s.almacen_id] = s.cantidad
+    # 2. Captura del filtro de propietario desde la URL
+    propietario_filtro_id = request.args.get("propietario_id", "todos")
 
-    # 2. CÁLCULOS FINANCIEROS Y REPORTES
-    total_invertido = 0.0
-    total_venta_estimada = 0.0
+    # 3. Consulta de productos filtrados
+    if propietario_filtro_id != "todos" and propietario_filtro_id.isdigit():
+        productos = Producto.query.filter_by(
+            propietario_id=int(propietario_filtro_id)
+        ).all()
+    else:
+        productos = Producto.query.all()
 
-    for prod in productos:
-        # Sumamos la cantidad de este producto en todos los almacenes registrados en stock_map
-        cantidades_almacen = stock_map.get(prod.id, {}).values()
-        stock_total_producto = sum(cantidades_almacen)
-        
-        # Multiplicamos por sus respectivos precios
-        costo_unitario = prod.precio_costo or 0.0
-        venta_unitaria = prod.precio_venta or 0.0
+    # 4. Cálculo de métricas usando las propiedades del modelo Producto
+    inversion_stock = 0.0
+    valor_venta = 0.0
 
-        total_invertido += stock_total_producto * costo_unitario
-        total_venta_estimada += stock_total_producto * venta_unitaria
+    for p in productos:
+        # Usa la propiedad 'cantidad_total' definida en Producto
+        stock_total = p.cantidad_total
+        costo = p.precio_costo or 0.0
+        precio = p.precio_venta or 0.0
 
-    # Ganancia proyectada en dinero
-    ganancia_potencial = total_venta_estimada - total_invertido
+        inversion_stock += costo * stock_total
+        valor_venta += precio * stock_total
 
-    # 3. Renderizado de plantilla con las nuevas variables
+    ganancia_proyectada = valor_venta - inversion_stock
+    efectivo_caja = session.get("efectivo_caja", 0.0)
+
+    # 5. Renderizado alineado exactamente con la plantilla Jinja2
     return render_template(
-        'admin_almacenes.html',
-        productos=productos,
+        "admin_almacenes.html",
         almacenes=almacenes,
         proveedores=proveedores,
-        stock_map=json.dumps(stock_map),
-        total_invertido=total_invertido,
-        total_venta_estimada=total_venta_estimada,
-        ganancia_potencial=ganancia_potencial
+        propietarios=propietarios,
+        tipos_operacion=tipos_operacion,
+        conceptos=conceptos,
+        productos=productos,
+        propietario_filtro_id=str(propietario_filtro_id),
+        total_invertido=inversion_stock,
+        total_venta_estimada=valor_venta,  # Nombre requerido por el HTML
+        ganancia_potencial=ganancia_proyectada,  # Nombre requerido por el HTML
+        efectivo_caja=efectivo_caja,
+        hoy=date.today(),  # Para el cálculo de fecha_vencimiento en el HTML
     )
-
-
 @app.route('/trasladar_stock', methods=['POST'])
 def trasladar_stock():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -545,7 +591,10 @@ def guardar_producto():
 
     # CAPTURAR EL ESTADO DE PAGO DESDE EL FORMULARIO
     estado_pago = request.form.get('estado_pago', 'Pagado') 
+    propietario_id = request.form.get("propietario_id")
 
+    # Si viene como cadena vacía o no existe, puedes definir un valor por defecto o lanzar error
+    id_final = int(propietario_id) if propietario_id and propietario_id.isdigit() else None
     # Calcular monto pendiente
     monto_pendiente = 0.0
     if estado_pago == 'Pendiente':
@@ -559,7 +608,8 @@ def guardar_producto():
         proveedor_id=int(proveedor_id) if proveedor_id else None,
         estado_pago=estado_pago,             
         monto_pendiente=monto_pendiente,
-        fecha_vencimiento=fecha_vencimiento  # <-- CAMPO AGREGADO AQUÍ
+        fecha_vencimiento=fecha_vencimiento,
+        propietario_id=id_final
     )
     db.session.add(nuevo_producto)
     db.session.flush()  # Para obtener el ID generado del nuevo_producto
@@ -676,6 +726,36 @@ def procesar_cierre():
         db.session.rollback()
         print(f"Error en procesar_cierre: {e}")
         return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
+
+@app.route('/editar_producto/<int:id>', methods=['POST'])
+def editar_producto(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    producto = Producto.query.get_or_404(id)
+
+    # 1. Obtener datos del formulario
+    producto.nombre = request.form.get('nombre')
+    producto.unidad_medida = request.form.get('unidad_medida', 'u')
+    producto.precio_costo = float(request.form.get('precio_costo', 0.0))
+    producto.precio_venta = float(request.form.get('precio_venta', 0.0))
+    
+    proveedor_id = request.form.get('proveedor_id')
+    producto.proveedor_id = int(proveedor_id) if proveedor_id else None
+
+    # Parsear Fecha de Vencimiento
+    fecha_venc_str = request.form.get('fecha_vencimiento')
+    if fecha_venc_str:
+        try:
+            producto.fecha_vencimiento = datetime.strptime(fecha_venc_str, '%Y-%m-%d').date()
+        except ValueError:
+            producto.fecha_vencimiento = None
+    else:
+        producto.fecha_vencimiento = None
+
+    db.session.commit()
+    flash("Producto actualizado exitosamente", "info")
+    return redirect(url_for('vista_admin'))    
 # -----------------------------------------------------------------#
 # CONSULTA DE CIERRES Y REPORTES (ADMIN)
 # -----------------------------------------------------------------#
@@ -723,6 +803,7 @@ def obtener_detalle_cierre(id_cierre):
         },
         'detalles': detalles
     })
+
 # -----------------------------------------------------------------#
 # CUENTAS POR PAGAR
 # -----------------------------------------------------------------#

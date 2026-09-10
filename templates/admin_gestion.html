@@ -4,13 +4,13 @@
 <main class="p-6 space-y-8 flex-1">
     <header class="flex justify-between items-center">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-tight">Almacenes y Proveedores</h1>
-            <p class="text-sm text-gray-400 mt-0.5">Gestión centralizada de ubicaciones físicas y datos de proveedores
+            <h1 class="text-2xl font-bold text-white tracking-tight">Gestión Centralizada</h1>
+            <p class="text-sm text-gray-400 mt-0.5">Administración de almacenes, proveedores y propietarios
             </p>
         </div>
     </header>
 
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         <!-- SECCIÓN: ALMACENES -->
         <section class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col justify-between">
@@ -113,6 +113,52 @@
             </div>
         </section>
 
+        <!-- SECCIÓN: PROPIETARIOS -->
+        <section class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col justify-between">
+            <div>
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-lg font-bold text-white">Propietarios</h2>
+                    <button onclick="abrirModalPropietario()"
+                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition">
+                        + Nuevo Propietario
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead>
+                            <tr
+                                class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
+                                <th class="p-3">Nombre</th>
+                                <th class="p-3">Descripción</th>
+                                <th class="p-3 text-right">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-800/60">
+                            {% for prop in propietarios %}
+                            <tr class="hover:bg-gray-800/30">
+                                <td class="p-3 font-semibold text-white">{{ prop.nombre }}</td>
+                                <td class="p-3 text-gray-400">{{ prop.descripcion if prop.descripcion else '-' }}</td>
+                                <td class="p-3 text-right">
+                                    <form action="{{ url_for('eliminar_propietario', id=prop.id) }}" method="POST"
+                                        onsubmit="return confirm('¿Eliminar propietario?');">
+                                        <button type="submit"
+                                            class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="3" class="p-4 text-center text-gray-500">No hay propietarios registrados.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
     </div>
 </main>
 
@@ -174,6 +220,32 @@
         </form>
     </div>
 </div>
+
+<!-- MODAL CREAR PROPIETARIO -->
+<div id="modal-propietario"
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6">
+        <h3 class="text-lg font-bold text-white mb-4">Agregar Propietario</h3>
+        <form action="{{ url_for('gestionar_propietarios') }}" method="POST" class="space-y-4 text-sm">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre del Propietario *</label>
+                <input type="text" name="nombre" required placeholder="Ej: Socio A, Negocio B..."
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Descripción / Notas</label>
+                <input type="text" name="descripcion" placeholder="Ej: Inversionista principal"
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" onclick="cerrarModalPropietario()"
+                    class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
+                <button type="submit" class="px-5 py-2 bg-orange-600 text-white font-bold rounded-xl">Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <div class="db-tools-container">
     <!-- Tarjeta Exportar -->
     <div class="db-card">
@@ -209,7 +281,7 @@
         </form>
     </div>
 </div>
-<!-- SECCIÓN GESTIÓN DE CONCEPTOS DE MOVIMIENTO -->
+
 <!-- SECCIÓN GESTIÓN DE TIPOS DE OPERACIÓN Y CONCEPTOS -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
 
@@ -329,11 +401,15 @@
     </div>
 
 </div>
+
 <script>
     function abrirModalAlmacen() { document.getElementById('modal-almacen').classList.remove('hidden'); document.getElementById('modal-almacen').classList.add('flex'); }
     function cerrarModalAlmacen() { document.getElementById('modal-almacen').classList.remove('flex'); document.getElementById('modal-almacen').classList.add('hidden'); }
 
     function abrirModalProveedor() { document.getElementById('modal-proveedor').classList.remove('hidden'); document.getElementById('modal-proveedor').classList.add('flex'); }
     function cerrarModalProveedor() { document.getElementById('modal-proveedor').classList.remove('flex'); document.getElementById('modal-proveedor').classList.add('hidden'); }
+
+    function abrirModalPropietario() { document.getElementById('modal-propietario').classList.remove('hidden'); document.getElementById('modal-propietario').classList.add('flex'); }
+    function cerrarModalPropietario() { document.getElementById('modal-propietario').classList.remove('flex'); document.getElementById('modal-propietario').classList.add('hidden'); }
 </script>
 {% endblock %}

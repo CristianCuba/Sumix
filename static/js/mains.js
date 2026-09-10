@@ -18,8 +18,75 @@ function cerrarModalProducto() {
     }
 }
 
+// ==========================================
+// MODAL DE EDICIÓN DE PRODUCTOS
+// ==========================================
+function abrirModalEditarProducto(btn) {
+    // 1. Obtener los atributos data- del botón
+    const id = btn.getAttribute('data-id');
+    const nombre = btn.getAttribute('data-nombre');
+    const unidad = btn.getAttribute('data-unidad');
+    const costo = btn.getAttribute('data-costo');
+    const venta = btn.getAttribute('data-venta');
+    const proveedorId = btn.getAttribute('data-proveedor');
+    const fechaVenc = btn.getAttribute('data-vencimiento');
 
-// static/js/mains.js
+    const modal = document.getElementById('modal-editar-producto');
+    const form = document.getElementById('form-editar-producto');
+
+    if (modal && form) {
+        // Asignar el endpoint de actualización con el ID del producto
+        form.action = `/editar_producto/${id}`;
+
+        // Rellenar cada campo del formulario
+        if (document.getElementById('edit_nombre')) document.getElementById('edit_nombre').value = nombre || '';
+        if (document.getElementById('edit_unidad_medida')) document.getElementById('edit_unidad_medida').value = unidad || 'u';
+        if (document.getElementById('edit_precio_costo')) document.getElementById('edit_precio_costo').value = costo || '0';
+        if (document.getElementById('edit_precio_venta')) document.getElementById('edit_precio_venta').value = venta || '0';
+        if (document.getElementById('edit_proveedor_id')) document.getElementById('edit_proveedor_id').value = proveedorId || '';
+        if (document.getElementById('edit_fecha_vencimiento')) document.getElementById('edit_fecha_vencimiento').value = fechaVenc || '';
+
+        // Mostrar el modal
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function cerrarModalEditarProducto() {
+    const modal = document.getElementById('modal-editar-producto');
+    if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
+}
+
+function cerrarModalEditarProducto() {
+    const modal = document.getElementById('modal-editar-producto');
+    if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
+}
+function filtrarTablaProductos() {
+    const input = document.getElementById('filtro-productos');
+    const filter = input.value.toLowerCase().trim();
+    
+    // Selecciona todas las filas dentro del tbody de la tabla
+    const filas = document.querySelectorAll('tbody tr');
+
+    filas.forEach(fila => {
+        // Obtiene todo el texto visible de la fila (nombre, proveedor, etc.)
+        const textoFila = fila.textContent.toLowerCase();
+
+        // Oculta o muestra la fila según coincida con la búsqueda
+        if (textoFila.includes(filter)) {
+            fila.style.display = '';
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+}
+
 
 /// main.js - Declaraciones al inicio
 var mapaStock = {};

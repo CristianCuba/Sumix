@@ -68,8 +68,37 @@
         // Le pasas a la función de main.js los datos dict de Flask
         cargarMapaStock('{{ mapa_stock_json | tojson | safe if mapa_stock_json else "{}" }}');
     </script>
+<!-- Filtro Dinámico por Propietario -->
+<div class="flex flex-wrap gap-2 mb-6">
+    <a href="?propietario_id=todos"
+        class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == 'todos' %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
+        Todos los Propietarios
+    </a>
+
+    {% for prop in propietarios %}
+    <a href="?propietario_id={{ prop.id }}"
+        class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == prop.id|string %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
+        {{ prop.nombre }}
+    </a>
+    {% endfor %}
+</div>
     </header>
-    
+    <!-- Barra de Filtro / Búsqueda -->
+    <div class="mb-4 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div class="relative w-full sm:w-80">
+            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+            <input type="text" id="filtro-productos" onkeyup="filtrarTablaProductos()"
+                placeholder="Buscar por nombre o proveedor..."
+                class="w-full pl-9 pr-4 py-2 bg-[#121316] border border-gray-800 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-orange-500/50 transition-all">
+        </div>
+
+</div>
+
     <!-- Tabla Detallada de Inventario -->
     <section class="p-6 flex-1">
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
@@ -178,7 +207,11 @@
                             <td class="p-4 text-center font-mono font-bold text-amber-400">
                                 {{ producto.cantidad_total }}
                             </td>
-                
+                            <!-- Botón Editar -->
+                            <!-- Botón Editar -->
+                            <!-- Botón Editar -->
+                            <!-- Botón Editar -->
+                           
                             <!-- Acciones -->
                             <td class="p-4 text-center">
                                 <div class="flex items-center justify-center gap-2">
@@ -192,7 +225,20 @@
                                         </svg>
                                         Mover
                                     </button>
-                
+                                    <button type="button" onclick="abrirModalEditarProducto(this)" data-id="{{ producto.id }}"
+                                        data-nombre="{{ producto.nombre }}" data-unidad="{{ producto.unidad_medida or 'u' }}"
+                                        data-costo="{{ producto.precio_costo }}" data-venta="{{ producto.precio_venta }}"
+                                        data-proveedor="{{ producto.proveedor_id or '' }}"
+                                        data-vencimiento="{% if producto.fecha_vencimiento %}{{ producto.fecha_vencimiento.strftime('%Y-%m-%d') }}{% endif %}"
+                                        title="Editar Producto"
+                                        class="px-2.5 py-1.5 bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 012.828 0L20.5 5.5a2 2 0 010 2.828l-8.5 8.5H9v-3.5l8.5-8.5z">
+                                            </path>
+                                        </svg>
+                                        Editar
+                                    </button>
                                     <!-- Botón Eliminar -->
                                     <form action="{{ url_for('eliminar_producto', id=producto.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este producto? Esta acción borrará también su stock en todos los almacenes.');" class="inline">
                                         <button type="submit" 
@@ -215,7 +261,96 @@
     </section>
     
  
-      
+    <!-- Modal: Editar Producto -->
+    <div id="modal-editar-producto"
+        class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white">Editar Producto</h3>
+                <button onclick="cerrarModalEditarProducto()"
+                    class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+    
+            <form id="form-editar-producto" method="POST" action="" class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del
+                        Producto</label>
+                    <input type="text" id="edit_nombre" name="nombre" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                </div>
+    
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad de Medida</label>
+                        <select id="edit_unidad_medida" name="unidad_medida" required
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                            <option value="u">Unidad (u)</option>
+                            <option value="lb">Libras (lb)</option>
+                            <option value="kg">Kilogramos (kg)</option>
+                            <option value="caja">Caja</option>
+                            <option value="paquete">Paquete</option>
+                            <option value="L">Litro (L)</option>
+                        </select>
+                    </div>
+                    <!-- Fila de Proveedor y Propietario -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Selector de Proveedor -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Proveedor</label>
+                            <select name="proveedor_id"
+                                class="w-[#1a1b1e] w-full bg-[#111214] border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm">
+                                <option value="">Seleccione un proveedor</option>
+                                {% for prov in proveedores %}
+                                <option value="{{ prov.id }}">{{ prov.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    
+                        <!-- NUEVO: Selector de Propietario -->
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Propietario</label>
+                            <select name="propietario_id"
+                                class="w-full bg-[#111214] border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm">
+                                <option value="">Sin propietario (Propio)</option>
+                                {% for prop in propietarios %}
+                                <option value="{{ prop.id }}">{{ prop.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+    
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Costo Unitario</label>
+                        <input type="number" step="0.01" id="edit_precio_costo" name="precio_costo" required
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Venta Unitario</label>
+                        <input type="number" step="0.01" id="edit_precio_venta" name="precio_venta" required
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                    </div>
+                </div>
+    
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">
+                        Vencimiento <span class="text-gray-500 font-normal lowercase">(opcional)</span>
+                    </label>
+                    <input type="date" id="edit_fecha_vencimiento" name="fecha_vencimiento"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none [color-scheme:dark]">
+                </div>
+    
+                <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                    <button type="button" onclick="cerrarModalEditarProducto()"
+                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
+                    <button type="submit"
+                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Actualizar
+                        Producto</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <!-- Modal: Crear Nuevo Producto -->
     <div id="modal-producto" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
@@ -226,12 +361,15 @@
             </div>
     
             <form method="POST" action="{{ url_for('guardar_producto') }}" class="space-y-4 text-sm">
+                <!-- Nombre -->
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del Producto</label>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del
+                        Producto</label>
                     <input type="text" name="nombre" required placeholder="Ej: Malta Bucanero"
                         class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none">
                 </div>
     
+                <!-- Almacén Inicial -->
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Almacén Inicial</label>
                     <select name="almacen_id" id="prod_almacen" required
@@ -243,6 +381,7 @@
                     </select>
                 </div>
     
+                <!-- Cantidad, Unidad, Costo, Venta -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad Inicial</label>
@@ -275,19 +414,33 @@
                     </div>
                 </div>
     
+                <!-- PROVEEDOR Y PROPIETARIO (NUEVO) -->
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Proveedor</label>
-                        <select name="proveedor_id" id="prod_proveedor" required
+                        <select name="proveedor_id" id="prod_proveedor"
                             class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                            <option value="" disabled selected>Seleccione un proveedor</option>
+                            <option value="" selected>Seleccione un proveedor</option>
                             {% for proveedor in proveedores %}
                             <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
                             {% endfor %}
                         </select>
                     </div>
     
-                    <!-- CAMPO NUEVO: Fecha de Vencimiento -->
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Propietario</label>
+                        <select name="propietario_id" id="prod_propietario"
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                            <option value="" selected>Sin Propietario (Propio)</option>
+                            {% for propietario in propietarios %}
+                            <option value="{{ propietario.id }}">{{ propietario.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+    
+                <!-- VENCIMIENTO Y ESTADO DEL PAGO -->
+                <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">
                             Vencimiento <span class="text-gray-500 font-normal lowercase">(opcional)</span>
@@ -295,22 +448,24 @@
                         <input type="date" name="fecha_vencimiento"
                             class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none [color-scheme:dark]">
                     </div>
+    
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Estado del Pago</label>
+                        <select name="estado_pago" required
+                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                            <option value="Pagado">Pagado al contado</option>
+                            <option value="Pendiente">Pendiente (A Crédito / Cuentas por Pagar)</option>
+                        </select>
+                    </div>
                 </div>
     
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Estado del Pago</label>
-                    <select name="estado_pago" required
-                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                        <option value="Pagado">Pagado al contado</option>
-                        <option value="Pendiente">Pendiente (A Crédito / Cuentas por Pagar)</option>
-                    </select>
-                </div>
-    
+                <!-- Botones de Acción -->
                 <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
                     <button type="button" onclick="cerrarModalProducto()"
                         class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
                     <button type="submit"
-                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Guardar Producto</button>
+                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Guardar
+                        Producto</button>
                 </div>
             </form>
         </div>
