@@ -88,7 +88,7 @@ function filtrarTablaProductos() {
 }
 
 
-/// main.js - Declaraciones al inicio
+// Declaraciones al inicio (solo una vez)
 var mapaStock = {};
 var productoSeleccionadoId = null;
 
@@ -102,16 +102,99 @@ function abrirModalTraslado(id, nombre) {
     const campoId = document.getElementById('modalProductoId');
     const campoNombre = document.getElementById('modalProductoNombre');
     const modal = document.getElementById('modalTraslado');
+    const selectorOrigen = document.getElementById('modalAlmacenOrigen');
 
     if (campoId) campoId.value = id;
     if (campoNombre) campoNombre.textContent = 'Producto: ' + nombre;
     if (modal) modal.classList.remove('hidden');
 
-    actualizarStockDisponible();
+    // Inicializar selectores de conceptos y comportamiento
+    if (typeof actualizarConceptos === 'function') actualizarConceptos();
+    if (typeof cambiarTipoOperacion === 'function') cambiarTipoOperacion();
+
+    // AUTO-SELECCIONAR el almacén que tenga stock disponible para evitar enviar un ID incorrecto
+    if (selectorOrigen && window.mapaStock && window.mapaStock[productoSeleccionadoId]) {
+        const stockProducto = window.mapaStock[productoSeleccionadoId];
+        // Buscar el primer almacén con stock > 0
+        const almacenConStock = Object.keys(stockProducto).find(almId => stockProducto[almId] > 0);
+        
+        if (almacenConStock) {
+            selectorOrigen.value = almacenConStock;
+        }
+    }
+
+    if (typeof actualizarStockDisponible === 'function') {
+        actualizarStockDisponible();
+    }
+}
+
+function actualizarConceptos() {
+    const selectTipo = document.getElementById('modalTipoOperacion');
+    const selectConcepto = document.getElementById('modalConcepto');
+    if (!selectTipo || !selectConcepto) return;
+
+    const tipoIdActual = parseInt(selectTipo.value);
+    selectConcepto.innerHTML = '';
+
+    const filtrados = listaConceptos.filter(c => c.tipo_id === tipoIdActual);
+    
+    if (filtrados.length === 0) {
+        let opt = document.createElement('option');
+        opt.value = "";
+        opt.textContent = "No hay conceptos para este tipo";
+        selectConcepto.appendChild(opt);
+    } else {
+        filtrados.forEach(c => {
+            let opt = document.createElement('option');
+            opt.value = c.id;
+            opt.textContent = c.nombre;
+            selectConcepto.appendChild(opt);
+        });
+    }
+}
+
+function cambiarTipoOperacion() {
+    if (typeof actualizarConceptos === 'function') {
+        actualizarConceptos(); 
+    }
+
+    const selectTipo = document.getElementById('modalTipoOperacion');
+    if (!selectTipo) return;
+
+    const selectedOption = selectTipo.options[selectTipo.selectedIndex];
+    
+    // Leemos los atributos booleanos que definiste en la base de datos
+    const requiereOrigen = selectedOption.getAttribute('data-requiere-origen') === 'true';
+    const requiereDestino = selectedOption.getAttribute('data-requiere-destino') === 'true';
+
+    const contenedorOrigen = document.getElementById('contenedorOrigen');
+    const contenedorDestino = document.getElementById('contenedorDestino');
+    const inputOrigen = document.getElementById('modalAlmacenOrigen');
+    const inputDestino = document.getElementById('modalAlmacenDestino');
+
+    if (!contenedorOrigen || !contenedorDestino) return;
+
+    // Manejo dinámico del Origen
+    if (requiereOrigen) {
+        contenedorOrigen.style.display = 'block';
+        if (inputOrigen) inputOrigen.required = true;
+        if (typeof actualizarStockDisponible === 'function') actualizarStockDisponible();
+    } else {
+        contenedorOrigen.style.display = 'none';
+        if (inputOrigen) inputOrigen.required = false;
+    }
+
+    // Manejo dinámico del Destino
+    if (requiereDestino) {
+        contenedorDestino.style.display = 'block';
+        if (inputDestino) inputDestino.required = true;
+    } else {
+        contenedorDestino.style.display = 'none';
+        if (inputDestino) inputDestino.required = false;
+    }
 }
 
 function actualizarStockDisponible() {
-    // Control de seguridad: Si no hay ID seleccionado aún, no hace nada
     if (!productoSeleccionadoId) return;
 
     const selectorOrigen = document.getElementById('modalAlmacenOrigen');
@@ -120,8 +203,34 @@ function actualizarStockDisponible() {
     if (!selectorOrigen || !textoStock) return;
 
     const almacenId = selectorOrigen.value;
+    const stockProducto = (window.mapaStock && window.mapaStock[productoSeleccionadoId]) || {};
+    const cantidadDisponible = stockProducto[almacenId] ?? stockProducto[parseInt(almacenId)] ?? 0;
+
+    textoStock.textContent = `Disponible: ${cantidadDisponible}`;
+    textoStock.className = cantidadDisponible <= 0 
+        ? "text-xs font-mono font-bold text-rose-500" 
+        : "text-xs font-mono font-bold text-emerald-400";
+}
+
+function cerrarModalTraslado() {
+    const modal = document.getElementById('modalTraslado');
+    if (modal) modal.classList.add('hidden');
+    productoSeleccionadoId = null;
+}
+
+function actualizarStockDisponible() {
+    if (!productoSeleccionadoId) return;
+
+    const selectorOrigen = document.getElementById('modalAlmacenOrigen');
+    const textoStock = document.getElementById('stockDisponibleText');
+
+    if (!selectorOrigen || !textoStock) return;
+
+    const almacenId = selectorOrigen.value;
+    
+    // Aseguramos conversión de tipos por si las claves del objeto son numéricas y el value es string
     const stockProducto = mapaStock[productoSeleccionadoId] || {};
-    const cantidadDisponible = stockProducto[almacenId] || 0;
+    const cantidadDisponible = stockProducto[almacenId] ?? stockProducto[parseInt(almacenId)] ?? 0;
 
     textoStock.textContent = `Disponible: ${cantidadDisponible}`;
 
@@ -132,11 +241,6 @@ function actualizarStockDisponible() {
     }
 }
 
-function cerrarModalTraslado() {
-    const modal = document.getElementById('modalTraslado');
-    if (modal) modal.classList.add('hidden');
-    productoSeleccionadoId = null;
-}
 
 // ==========================================
 // CONTROL DEL CIERRE DE DÍA Y ARQUEO DE CAJA
@@ -162,55 +266,124 @@ function calcular() {
     let totalEsperado = 0;
     const filas = document.querySelectorAll('.fila-producto');
 
-    if (filas.length === 0) return;
+    filas.forEach(fila => {
+        const idProducto = fila.getAttribute('data-id');
+        const precio = parseFloat(fila.getAttribute('data-precio')) || 0;
+        
+        const inputInicial = fila.querySelector('.stock-inicial');
+        const inputEntradas = fila.querySelector('.entradas');
+        const inputFinal = fila.querySelector('.stock-final');
+        const spanVendidos = fila.querySelector('.vendidos');
+        const spanSubtotal = fila.querySelector('.subtotal');
 
-    filas.forEach(row => {
-        let precio = parseFloat(row.dataset.precio) || 0;
-        let inicial = parseFloat(row.querySelector('.stock-inicial')?.value) || 0;
-        let entradas = parseFloat(row.querySelector('.entradas')?.value) || 0;
-        let final = parseFloat(row.querySelector('.stock-final')?.value) || 0;
+        const inicial = parseFloat(inputInicial.value) || 0;
+        const entradas = parseFloat(inputEntradas.value) || 0;
+        const finalFisico = parseFloat(inputFinal.value) || 0;
 
-        let vendidos = (inicial + entradas) - final;
-        if (vendidos < 0) vendidos = 0;
+        // 1. Calcular cuánto se comió/sacó por deudas/apuntes para este producto específico
+        let cantidadEnDeudas = 0;
+        if (typeof listaDeudas !== 'undefined') {
+            listaDeudas.forEach(deuda => {
+                if (deuda.productoId === idProducto) {
+                    cantidadEnDeudas += deuda.cantidad;
+                }
+            });
+        }
 
-        let subtotal = vendidos * precio;
+        // 2. Vendidos reales = Lo que falta en inventario MENOS lo que se registró como deuda/retiro
+        let vendidosBrutos = (inicial + entradas) - finalFisico;
+        let vendidosReales = vendidosBrutos - cantidadEnDeudas;
+        
+        // Evitar números negativos por seguridad visual
+        if (vendidosReales < 0) vendidosReales = 0;
+
+        const subtotal = vendidosReales * precio;
+
+        // Actualizar la interfaz de la fila
+        spanVendidos.textContent = vendidosReales.toFixed(vendidosReales % 1 !== 0 ? 2 : 0);
+        spanSubtotal.textContent = `$${subtotal.toFixed(2)}`;
+
         totalEsperado += subtotal;
-
-        const elVendidos = row.querySelector('.vendidos');
-        const elSubtotal = row.querySelector('.subtotal');
-
-        if (elVendidos) elVendidos.textContent = vendidos.toFixed(2);
-        if (elSubtotal) elSubtotal.textContent = '$' + subtotal.toFixed(2);
     });
 
-    const elTotalEsperado = document.getElementById('total-esperado');
-    const elDineroCaja = document.getElementById('dinero-caja');
-    const btnCierre = document.getElementById('btn-cierre');
-
-    if (elTotalEsperado) {
-        elTotalEsperado.textContent = '$' + totalEsperado.toFixed(2);
+    // Actualizar el total esperado abajo en la barra de cierre
+    const spanTotalEsperado = document.getElementById('total-esperado');
+    if (spanTotalEsperado) {
+        spanTotalEsperado.textContent = `$${totalEsperado.toFixed(2)}`;
     }
 
-    if (elDineroCaja && btnCierre) {
-        let valorCajaRaw = elDineroCaja.value.trim();
-        let efectivoFisico = parseFloat(valorCajaRaw);
-
-        // 1. Calculamos la diferencia entre el efectivo ingresado y el total esperado
-        let diferencia = Math.abs(efectivoFisico - totalEsperado);
-
-        // 2. La caja cuadra solo si la diferencia es 0 y se ingresó un valor válido
-        let cajaCuadrada = valorCajaRaw !== '' && !isNaN(efectivoFisico) && diferencia < 0.01;
-
-        if (cajaCuadrada) {
-            btnCierre.disabled = false;
-            btnCierre.className = "w-full md:w-auto px-8 py-3.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl cursor-pointer transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-orange-600/30 active:scale-95";
-        } else {
-            btnCierre.disabled = true;
-            btnCierre.className = "w-full md:w-auto px-8 py-3.5 bg-gray-800 text-gray-500 font-bold rounded-xl cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2 shadow-lg";
-        }
-    }
+    // Validar si se puede cerrar caja (ejemplo de validación de botones)
+    validarCierreCaja(totalEsperado);
 }
+let listaDeudas = [];
 
+    function agregarDeuda() {
+        const selectProd = document.getElementById('deuda-producto-select');
+        const opcionSelected = selectProd.options[selectProd.selectedIndex];
+
+        const productoId = selectProd.value;
+        const productoNombre = opcionSelected.getAttribute('data-nombre');
+        const precioVenta = parseFloat(opcionSelected.getAttribute('data-precio')) || 0;
+
+        const conceptoInput = document.getElementById('deuda-concepto');
+        const concepto = conceptoInput.value.trim() || "Consumo Personal / Dueño";
+
+        const cantidadInput = document.getElementById('deuda-cantidad');
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+
+        if (cantidad <= 0) {
+            alert("La cantidad debe ser mayor a 0");
+            return;
+        }
+
+        // Añadir al array temporal
+        listaDeudas.push({
+            id: Date.now(),
+            productoId: productoId,
+            productoNombre: productoNombre,
+            concepto: concepto,
+            cantidad: cantidad,
+            subtotal: cantidad * precioVenta
+        });
+
+        // Limpiar inputs de deudas
+        conceptoInput.value = "";
+        cantidadInput.value = "1";
+
+        renderizarDeudas();
+        calcular();
+    }
+
+    function eliminarDeuda(id) {
+        listaDeudas = listaDeudas.filter(item => item.id !== id);
+        renderizarDeudas();
+        calcular();
+    }
+
+    function renderizarDeudas() {
+        const container = document.getElementById('tabla-deudas-container');
+
+        if (listaDeudas.length === 0) {
+            container.innerHTML = `<tr id="sin-deudas-row"><td colspan="5" class="py-4 text-center text-gray-500 italic">No hay apuntes o deudas registradas en este turno.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        listaDeudas.forEach(item => {
+            html += `
+                <tr class="hover:bg-gray-800/20">
+                    <td class="py-2.5 px-3 font-medium text-white">${item.concepto}</td>
+                    <td class="py-2.5 px-3 text-gray-300">${item.productoNombre}</td>
+                    <td class="py-2.5 px-3 text-center font-mono text-orange-400">${item.cantidad}</td>
+                    <td class="py-2.5 px-3 text-right font-mono text-white">$${item.subtotal.toFixed(2)}</td>
+                    <td class="py-2.5 px-3 text-center">
+                        <button type="button" onclick="eliminarDeuda(${item.id})" class="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 transition">Quitar</button>
+                    </td>
+                </tr>
+            `;
+        });
+        container.innerHTML = html;
+    }
 // Envío de la liquidación del cierre al backend vía fetch()
 async function enviarCierre() {
     const elDineroCaja = document.getElementById('dinero-caja');

@@ -474,7 +474,14 @@ def vista_admin():
     proveedores = Proveedor.query.all()
     propietarios = Propietario.query.all()
     tipos_operacion = TipoOperacion.query.all()
+    
     conceptos = ConceptoMovimiento.query.all()
+
+    # 💡 Conversión limpia de conceptos a JSON para JavaScript
+    conceptos_json = [
+        {"id": c.id, "tipo_id": c.tipo_id, "nombre": c.nombre} 
+        for c in conceptos
+    ]
 
     # 2. Captura del filtro de propietario desde la URL
     propietario_filtro_id = request.args.get("propietario_id", "todos")
@@ -511,6 +518,7 @@ def vista_admin():
         propietarios=propietarios,
         tipos_operacion=tipos_operacion,
         conceptos=conceptos,
+        conceptos_json=conceptos_json,  # <--- Variable JSON inyectada
         productos=productos,
         propietario_filtro_id=str(propietario_filtro_id),
         total_invertido=inversion_stock,
@@ -525,49 +533,93 @@ def trasladar_stock():
         return redirect(url_for('login'))
 
     producto_id = request.form.get('producto_id', type=int)
+    tipo_operacion_id = request.form.get('tipo_operacion_id', type=int)
+    concepto_id = request.form.get('concepto_id', type=int)
     origen_id = request.form.get('almacen_origen_id', type=int)
     destino_id = request.form.get('almacen_destino_id', type=int)
     cantidad = request.form.get('cantidad', type=float, default=0.0)
 
-    # Validaciones básicas de entrada
-    if not producto_id or not origen_id or not destino_id or cantidad <= 0:
+    print(f"DEBUGGING -> producto_id recibido: {producto_id}")
+    print(f"DEBUGGING -> origen_id recibido: {origen_id}")
+    print(f"DEBUGGING -> cantidad recibida: {cantidad}")
+
+    # Validaciones básicas generales
+    if not producto_id or not tipo_operacion_id or not concepto_id or cantidad <= 0:
+        flash("Error: Faltan datos obligatorios o la cantidad es inválida.", "danger")
         return redirect(url_for('vista_admin'))
 
-    if origen_id == destino_id:
+    # Buscar el tipo de operación
+    tipo_op = TipoOperacion.query.get(tipo_operacion_id)
+    if not tipo_op:
+        flash("Error: El tipo de operación seleccionado no es válido.", "danger")
         return redirect(url_for('vista_admin'))
 
-    # 1. Buscar stock en el almacén de origen
-    stock_origen = StockAlmacen.query.filter_by(
-        producto_id=producto_id, 
-        almacen_id=origen_id
-    ).first()
+    # Limpiamos y convertimos a minúsculas
+    comportamiento = tipo_op.codigo.strip().lower() if tipo_op.codigo else ""
 
-    # Verificar que exista suficiente cantidad
-    if not stock_origen or stock_origen.cantidad < cantidad:
-        return redirect(url_for('vista_admin'))
+    # Diagnóstico en vivo de los stocks reales en la base de datos para este producto
+    stocks_existentes = StockAlmacen.query.filter_by(producto_id=producto_id).all()
+    print(f"DEBUGGING -> Pares (almacen_id, cantidad) reales en BD para este producto: {[(s.almacen_id, s.cantidad) for s in stocks_existentes]}")
 
-    # 2. Descontar del origen
-    stock_origen.cantidad -= cantidad
+    # 1. COMPORTAMIENTO: TRASLADO (Origen -> Destino)
+    if comportamiento.startswith('traslado'):
+        if not origen_id or not destino_id:
+            flash("Error: El traslado requiere un almacén de origen y un almacén de destino.", "danger")
+            return redirect(url_for('vista_admin'))
+        
+        if origen_id == destino_id:
+            flash("Error: El origen y el destino no pueden ser el mismo almacén.", "danger")
+            return redirect(url_for('vista_admin'))
+        
+        stock_origen = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=origen_id).first()
+        if not stock_origen or stock_origen.cantidad < cantidad:
+            flash("Error: No hay suficiente stock en el almacén de origen para realizar este traslado.", "danger")
+            return redirect(url_for('vista_admin'))
+        
+        stock_origen.cantidad -= cantidad
 
-    # 3. Sumar o crear el registro en el almacén de destino
-    stock_destino = StockAlmacen.query.filter_by(
-        producto_id=producto_id, 
-        almacen_id=destino_id
-    ).first()
+        stock_destino = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=destino_id).first()
+        if stock_destino:
+            stock_destino.cantidad += cantidad
+        else:
+            db.session.add(StockAlmacen(producto_id=producto_id, almacen_id=destino_id, cantidad=cantidad))
 
-    if stock_destino:
-        stock_destino.cantidad += cantidad
+    # 2. COMPORTAMIENTO: ENTRADA (Solo Destino / Incrementa stock)
+    elif comportamiento.startswith('entrada'):
+        if not destino_id:
+            flash("Error: La entrada requiere seleccionar un almacén de destino.", "danger")
+            return redirect(url_for('vista_admin'))
+        
+        stock_destino = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=destino_id).first()
+        if stock_destino:
+            stock_destino.cantidad += cantidad
+        else:
+            db.session.add(StockAlmacen(producto_id=producto_id, almacen_id=destino_id, cantidad=cantidad))
+
+    # 3. COMPORTAMIENTO: SALIDA (Solo Origen / Disminuye stock)
+    elif comportamiento.startswith('salida'):
+        if not origen_id:
+            flash("Error: La salida requiere seleccionar un almacén de origen.", "danger")
+            return redirect(url_for('vista_admin'))
+        
+        stock_origen = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=origen_id).first()
+        if not stock_origen:
+            flash("Error: Este producto no tiene registros de stock en el almacén seleccionado.", "danger")
+            return redirect(url_for('vista_admin'))
+            
+        if stock_origen.cantidad < cantidad:
+            flash(f"Error: Stock insuficiente. Intentas retirar {cantidad}, pero solo hay {stock_origen.cantidad} disponibles.", "danger")
+            return redirect(url_for('vista_admin'))
+        
+        stock_origen.cantidad -= cantidad
+
     else:
-        stock_destino = StockAlmacen(
-            producto_id=producto_id,
-            almacen_id=destino_id,
-            cantidad=cantidad
-        )
-        db.session.add(stock_destino)
+        flash(f"Error: El código de comportamiento '{tipo_op.codigo}' no está reconocido.", "danger")
+        return redirect(url_for('vista_admin'))
 
     db.session.commit()
+    flash("¡Movimiento registrado y stock actualizado con éxito!", "success")
     return redirect(url_for('vista_admin'))
-
 from datetime import datetime
 
 @app.route('/guardar_producto', methods=['POST'])
