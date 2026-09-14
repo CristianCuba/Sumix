@@ -11,7 +11,7 @@ git add .
 2. Guardar el estado local con un mensaje claro
 Bash
 
-git commit -m "Agregar modulo de gestion de fecha de vencimiento en productos"
+git commit -m "Arreglados los movimientos, y creado el modulo de deudas para el dependiente"
 
 3. Subir las actualizaciones a GitHub
 Bash

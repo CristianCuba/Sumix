@@ -7,16 +7,36 @@ from datetime import datetime  # Si la usas en otras partes
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 
 app = Flask(__name__)
+
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///sumix.db'
 app.config['SECRET_KEY'] = 'tu_clave_secreta'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+from compras import compras_bp
+app.register_blueprint(compras_bp)
 # -----------------------------------------------------------------#
 # MODELOS DE BASE DE DATOS
 # -----------------------------------------------------------------#
 
+class Compra(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    efectivo_inicial = db.Column(db.Float, nullable=False)
+    total_compra = db.Column(db.Float, nullable=False)
+    efectivo_restante = db.Column(db.Float, nullable=False)
+    items = db.relationship('ItemCompra', backref='compra', lazy=True, cascade='all, delete-orphan')
+
+class ItemCompra(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    compra_id = db.Column(db.Integer, db.ForeignKey('compra.id'), nullable=False)
+    nombre = db.Column(db.String(100), nullable=False)
+    proveedor = db.Column(db.String(100), nullable=True)
+    cantidad = db.Column(db.Float, nullable=False)
+    precio = db.Column(db.Float, nullable=False)
+    subtotal = db.Column(db.Float, nullable=False)
+    
 class Almacen(db.Model):
     __tablename__ = 'almacenes'
     id = db.Column(db.Integer, primary_key=True)

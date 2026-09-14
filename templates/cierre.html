@@ -188,73 +188,7 @@
 
 <!-- Script complementario para manejar deudas de forma limpia -->
 <script>
-    let listaDeudas = [];
-
-    function agregarDeuda() {
-        const selectProd = document.getElementById('deuda-producto-select');
-        const opcionSelected = selectProd.options[selectProd.selectedIndex];
-
-        const productoId = selectProd.value;
-        const productoNombre = opcionSelected.getAttribute('data-nombre');
-        const precioVenta = parseFloat(opcionSelected.getAttribute('data-precio')) || 0;
-
-        const conceptoInput = document.getElementById('deuda-concepto');
-        const concepto = conceptoInput.value.trim() || "Consumo Personal / Dueño";
-
-        const cantidadInput = document.getElementById('deuda-cantidad');
-        const cantidad = parseFloat(cantidadInput.value) || 0;
-
-        if (cantidad <= 0) {
-            alert("La cantidad debe ser mayor a 0");
-            return;
-        }
-
-        // Añadir al array temporal
-        listaDeudas.push({
-            id: Date.now(),
-            productoId: productoId,
-            productoNombre: productoNombre,
-            concepto: concepto,
-            cantidad: cantidad,
-            subtotal: cantidad * precioVenta
-        });
-
-        // Limpiar inputs de deudas
-        conceptoInput.value = "";
-        cantidadInput.value = "1";
-
-        renderizarDeudas();
-    }
-
-    function eliminarDeuda(id) {
-        listaDeudas = listaDeudas.filter(item => item.id !== id);
-        renderizarDeudas();
-    }
-
-    function renderizarDeudas() {
-        const container = document.getElementById('tabla-deudas-container');
-
-        if (listaDeudas.length === 0) {
-            container.innerHTML = `<tr id="sin-deudas-row"><td colspan="5" class="py-4 text-center text-gray-500 italic">No hay apuntes o deudas registradas en este turno.</td></tr>`;
-            return;
-        }
-
-        let html = '';
-        listaDeudas.forEach(item => {
-            html += `
-                <tr class="hover:bg-gray-800/20">
-                    <td class="py-2.5 px-3 font-medium text-white">${item.concepto}</td>
-                    <td class="py-2.5 px-3 text-gray-300">${item.productoNombre}</td>
-                    <td class="py-2.5 px-3 text-center font-mono text-orange-400">${item.cantidad}</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-white">$${item.subtotal.toFixed(2)}</td>
-                    <td class="py-2.5 px-3 text-center">
-                        <button type="button" onclick="eliminarDeuda(${item.id})" class="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 transition">Quitar</button>
-                    </td>
-                </tr>
-            `;
-        });
-        container.innerHTML = html;
-    }
+    
 </script>
 
 {% endblock %}
