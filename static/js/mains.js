@@ -263,58 +263,64 @@ function filtrarProductos() {
 
 // Recálculo dinámico de ventas, subtotales y habilitación del botón de cierre
 function calcular() {
-    let totalEsperado = 0;
-    const filas = document.querySelectorAll('.fila-producto');
+        let totalBruto = 0;
+        let ventasDayana = 0;
+        let tieneCristian = false;
 
-    filas.forEach(fila => {
-        const idProducto = fila.getAttribute('data-id');
-        const precio = parseFloat(fila.getAttribute('data-precio')) || 0;
-        
-        const inputInicial = fila.querySelector('.stock-inicial');
-        const inputEntradas = fila.querySelector('.entradas');
-        const inputFinal = fila.querySelector('.stock-final');
-        const spanVendidos = fila.querySelector('.vendidos');
-        const spanSubtotal = fila.querySelector('.subtotal');
+        const filas = document.querySelectorAll('.fila-producto');
+        let productosData = [];
 
-        const inicial = parseFloat(inputInicial.value) || 0;
-        const entradas = parseFloat(inputEntradas.value) || 0;
-        const finalFisico = parseFloat(inputFinal.value) || 0;
+        filas.forEach(fila => {
+            const id = fila.getAttribute('data-id');
+            const precio = parseFloat(fila.getAttribute('data-precio')) || 0;
+            const stockInicial = parseFloat(fila.querySelector('.stock-inicial').value) || 0;
+            const entradas = parseFloat(fila.querySelector('.entradas').value) || 0;
+            const stockFinal = parseFloat(fila.querySelector('.stock-final').value) || 0;
 
-        // 1. Calcular cuánto se comió/sacó por deudas/apuntes para este producto específico
-        let cantidadEnDeudas = 0;
-        if (typeof listaDeudas !== 'undefined') {
-            listaDeudas.forEach(deuda => {
-                if (deuda.productoId === idProducto) {
-                    cantidadEnDeudas += deuda.cantidad;
-                }
+            let vendidos = (stockInicial + entradas) - stockFinal;
+            if (vendidos < 0) vendidos = 0;
+
+            const subtotal = vendidos * precio;
+            totalBruto += subtotal;
+
+            // Leer datos del propietario inyectados en la fila
+            const propId = parseInt(fila.getAttribute('data-propietario-id')) || 0;
+            const propNombre = (fila.getAttribute('data-propietario-nombre') || "").toLowerCase();
+
+            if (propId === 1 || propNombre.includes('dayana')) {
+                ventasDayana += subtotal;
+            }
+            if (propId === 2 || propNombre.includes('cristian')) {
+                tieneCristian = true;
+            }
+
+            fila.querySelector('.vendidos').textContent = vendidos;
+            fila.querySelector('.subtotal').textContent = `$${subtotal.toFixed(2)}`;
+
+            productosData.push({
+                id: id,
+                entradas: entradas,
+                stock_final: stockFinal,
+                vendidos: vendidos,
+                subtotal: subtotal
             });
-        }
+        });
 
-        // 2. Vendidos reales = Lo que falta en inventario MENOS lo que se registró como deuda/retiro
-        let vendidosBrutos = (inicial + entradas) - finalFisico;
-        let vendidosReales = vendidosBrutos - cantidadEnDeudas;
-        
-        // Evitar números negativos por seguridad visual
-        if (vendidosReales < 0) vendidosReales = 0;
+        // Calcular montos de descuento
+        let descuentoCristian = tieneCristian ? 1000.0 : 0.0;
+        let comisionDayana = ventasDayana * 0.03;
+        let descuentoTotal = descuentoCristian + comisionDayana;
 
-        const subtotal = vendidosReales * precio;
+        let totalEsperado = totalBruto - descuentoTotal;
+        if (totalEsperado < 0) totalEsperado = 0;
 
-        // Actualizar la interfaz de la fila
-        spanVendidos.textContent = vendidosReales.toFixed(vendidosReales % 1 !== 0 ? 2 : 0);
-        spanSubtotal.textContent = `$${subtotal.toFixed(2)}`;
+        // Actualizar textos en pantalla para el dependiente
+        document.getElementById('total-esperado').textContent = `$${totalEsperado.toFixed(2)}`;
+        document.getElementById('txt-comision-dayana').textContent = `$${comisionDayana.toFixed(2)}`;
 
-        totalEsperado += subtotal;
-    });
-
-    // Actualizar el total esperado abajo en la barra de cierre
-    const spanTotalEsperado = document.getElementById('total-esperado');
-    if (spanTotalEsperado) {
-        spanTotalEsperado.textContent = `$${totalEsperado.toFixed(2)}`;
+        validarCierreCaja(totalEsperado);
     }
 
-    // Validar si se puede cerrar caja (ejemplo de validación de botones)
-    validarCierreCaja(totalEsperado);
-}
 let listaDeudas = [];
 
     function agregarDeuda() {
@@ -386,67 +392,39 @@ let listaDeudas = [];
     }
 // Envío de la liquidación del cierre al backend vía fetch()
 async function enviarCierre() {
-    const elDineroCaja = document.getElementById('dinero-caja');
-    const efectivoCaja = parseFloat(elDineroCaja ? elDineroCaja.value : 0) || 0;
+        const efectivoCaja = parseFloat(document.getElementById('dinero-caja').value) || 0;
+        const filas = document.querySelectorAll('.fila-producto');
+        let productos = [];
 
-    if (!confirm("¿Estás seguro de efectuar el cierre del día? Esto guardará el reporte y actualizará el inventario actual.")) {
-        return;
-    }
-
-    const productos = [];
-    const filas = document.querySelectorAll('.fila-producto');
-
-    filas.forEach(fila => {
-        const id = fila.dataset.id;
-        const inicial = parseFloat(fila.querySelector('.stock-inicial')?.value) || 0;
-        const entradas = parseFloat(fila.querySelector('.entradas')?.value) || 0;
-        const final = parseFloat(fila.querySelector('.stock-final')?.value) || 0;
-        const vendidos = parseFloat(fila.querySelector('.vendidos')?.textContent) || 0;
-        
-        let subtotalTexto = fila.querySelector('.subtotal')?.textContent || '0';
-        const subtotal = parseFloat(subtotalTexto.replace('$', '')) || 0;
-
-        if (id) {
+        filas.forEach(fila => {
             productos.push({
-                id: id,
-                stock_inicial: inicial,
-                entradas: entradas,
-                stock_final: final,
-                vendidos: vendidos,
-                subtotal: subtotal
+                id: fila.getAttribute('data-id'),
+                entradas: parseFloat(fila.querySelector('.entradas').value) || 0,
+                stock_final: parseFloat(fila.querySelector('.stock-final').value) || 0,
+                vendidos: parseFloat(fila.querySelector('.vendidos').textContent) || 0,
+                subtotal: parseFloat(fila.querySelector('.subtotal').textContent.replace('$', '')) || 0
             });
-        }
-    });
-
-    const btnCierre = document.getElementById('btn-cierre');
-    if (btnCierre) btnCierre.disabled = true;
-
-    try {
-        const response = await fetch('/procesar_cierre', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                efectivo_caja: efectivoCaja,
-                productos: productos
-            })
         });
 
-        const res = await response.json();
-        if (res.success) {
-            alert(res.message);
-            window.location.reload();
-        } else {
-            alert("Error al procesar el cierre: " + res.message);
-            if (btnCierre) btnCierre.disabled = false;
+        try {
+            const response = await fetch('/procesar_cierre', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ efectivo_caja: efectivoCaja, productos: productos })
+            });
+
+            const res = await response.json();
+            if (res.success) {
+                alert(res.message);
+                window.location.reload();
+            } else {
+                alert(res.message);
+            }
+        } catch (err) {
+            console.error("Error:", err);
+            alert("Ocurrió un error al procesar el cierre.");
         }
-    } catch (err) {
-        alert("Ocurrió un error de conexión al enviar el cierre.");
-        console.error("Error en enviarCierre:", err);
-        if (btnCierre) btnCierre.disabled = false;
     }
-}
 
 
 // ==========================================
@@ -464,6 +442,9 @@ async function verDetalleCierre(idCierre) {
 
         const cierre = res.cierre;
         const detalles = res.detalles;
+        const gananciasPropietarios = res.ganancias_propietarios || {};
+        const ventasBrutasPropietarios = res.ventas_brutas_propietarios || {};
+        const descuentosPropietarios = res.descuentos_propietarios || {};
 
         // Cargar encabezados
         document.getElementById('modal-cierre-titulo').textContent = `Detalle del Cierre #${cierre.id}`;
@@ -481,6 +462,53 @@ async function verDetalleCierre(idCierre) {
         } else {
             elDif.textContent = "$0.00";
             elDif.className = "text-xl font-bold font-mono text-gray-400";
+        }
+
+        // RENDERIZAR MÉTRICAS Y DESCUENTOS POR PROPIETARIO
+        const contenedorPropietarios = document.getElementById('modal-ganancias-propietarios');
+        contenedorPropietarios.innerHTML = '';
+
+        const propietariosSet = new Set([
+            ...Object.keys(gananciasPropietarios), 
+            ...Object.keys(ventasBrutasPropietarios)
+        ]);
+
+        if (propietariosSet.size > 0) {
+            propietariosSet.forEach(propietario => {
+                const ventaBruta = ventasBrutasPropietarios[propietario] || 0.0;
+                const gananciaFinal = gananciasPropietarios[propietario] || 0.0;
+                const infoDescuento = descuentosPropietarios[propietario];
+
+                // Construimos HTML opcional si tiene deducción/descuento
+                let htmlDescuento = '';
+                if (infoDescuento && infoDescuento.label) {
+                    htmlDescuento = `
+                        <div class="flex justify-between items-center text-xs text-red-400/90 mt-0.5">
+                            <span>(-) ${infoDescuento.label}:</span>
+                            <span class="font-mono">-$${infoDescuento.monto.toFixed(2)}</span>
+                        </div>
+                    `;
+                }
+
+                contenedorPropietarios.innerHTML += `
+                    <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800 text-left flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-semibold text-gray-300 block truncate mb-1.5">${propietario}</span>
+                            <div class="flex justify-between items-center text-xs text-gray-400 mb-0.5">
+                                <span>Venta Bruta:</span>
+                                <span class="font-mono text-white">$${ventaBruta.toFixed(2)}</span>
+                            </div>
+                            ${htmlDescuento}
+                        </div>
+                        <div class="border-t border-gray-800/80 pt-1.5 mt-2 flex justify-between items-center text-xs">
+                            <span class="text-gray-400 font-medium">Ganancia Neta:</span>
+                            <span class="font-mono font-bold text-orange-400">$${gananciaFinal.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+        } else {
+            contenedorPropietarios.innerHTML = `<span class="text-xs text-gray-500 col-span-full">No hay registros de propietarios.</span>`;
         }
 
         // Llenar tabla de productos
@@ -514,7 +542,6 @@ async function verDetalleCierre(idCierre) {
         alert("Ocurrió un error al obtener el detalle del cierre.");
     }
 }
-
 function cerrarModalDetalleCierre() {
     const modal = document.getElementById('modal-detalle-cierre');
     if (modal) {
@@ -526,34 +553,25 @@ function cerrarModalDetalleCierre() {
 // VALIDACIÓN DEL CIERRE DE CAJA
 // ==========================================
 function validarCierreCaja(totalEsperado) {
-    const elDineroCaja = document.getElementById('dinero-caja');
-    const btnCierre = document.getElementById('btn-cierre');
+        const elDineroCaja = document.getElementById('dinero-caja');
+        const btnCierre = document.getElementById('btn-cierre');
 
-    if (!elDineroCaja || !btnCierre) return;
+        if (!elDineroCaja || !btnCierre) return;
 
-    const efectivoCaja = parseFloat(elDineroCaja.value) || 0;
-    
-    // Aquí defines tu lógica de validación: 
-    // Por ejemplo, que el efectivo ingresado sea mayor a 0 y que coincida exactamente (o con margen de diferencia)
-    // O simplemente habilitarlo cuando el usuario haya introducido el dinero en caja y haya ventas.
-    const hasDineroIngresado = efectivoCaja > 0;
-    const hayVentas = totalEsperado >= 0;
+        const efectivoCaja = parseFloat(elDineroCaja.value) || 0;
+        const hasDineroIngresado = efectivoCaja > 0;
+        const hayVentas = totalEsperado >= 0;
 
-    // Puedes ajustar esta condición si exigías que el efectivo fuera exactamente igual al esperado:
-    // const esIgual = Math.abs(efectivoCaja - totalEsperado) < 0.01;
-
-    if (hasDineroIngresado && hayVentas) {
-        // Habilitar botón de cierre
-        btnCierre.disabled = false;
-        btnCierre.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
-        btnCierre.classList.add('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
-    } else {
-        // Bloquear botón de cierre
-        btnCierre.disabled = true;
-        btnCierre.classList.remove('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
-        btnCierre.classList.add('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+        if (hasDineroIngresado && hayVentas) {
+            btnCierre.disabled = false;
+            btnCierre.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+            btnCierre.classList.add('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
+        } else {
+            btnCierre.disabled = true;
+            btnCierre.classList.remove('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
+            btnCierre.classList.add('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+        }
     }
-}
 
 // ==========================================
 // UTILIDADES

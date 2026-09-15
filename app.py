@@ -718,15 +718,44 @@ def procesar_cierre():
     efectivo_caja = float(data.get('efectivo_caja', 0.0))
     productos_cierre = data.get('productos', [])
 
-    # 1. VALIDACIÓN EN BACKEND: Recalcular el total esperado
-    total_esperado = 0.0
+    # 1. VALIDACIÓN EN BACKEND: Calcular subtotales y deducciones por propietario
+    total_bruto = 0.0
+    ventas_por_propietario = {}
+
     for p_data in productos_cierre:
+        p_id = int(p_data['id'])
         subtotal = float(p_data.get('subtotal', 0.0))
-        total_esperado += subtotal
+        total_bruto += subtotal
+
+        # Consultar producto para identificar al propietario
+        producto = Producto.query.get(p_id)
+        if producto and producto.propietario:
+            prop_nombre = producto.propietario.nombre.strip().lower()
+            prop_id = producto.propietario.id
+            
+            # Agrupamos por nombre/id para aplicar las reglas
+            key = (prop_id, prop_nombre)
+            if key not in ventas_por_propietario:
+                ventas_por_propietario[key] = 0.0
+            ventas_por_propietario[key] += subtotal
+
+    # Calcular los descuentos a restar del efectivo esperado en caja
+    descuentos_totales = 0.0
+    for (prop_id, prop_nombre), venta_val in ventas_por_propietario.items():
+        # Regla para Cristian (Salario fijo de 1000)
+        if "cristian" in prop_nombre or prop_id == 2:
+            descuentos_totales += 1000.0
+        
+        # Regla para Dayana (3% de sus ventas netas/brutas, id 1)
+        elif "dayana" in prop_nombre or prop_id == 1:
+            descuentos_totales += (venta_val * 0.03)
+
+    # El efectivo esperado final en caja es el total bruto de ventas menos los retiros/salarios correspondientes
+    total_esperado = total_bruto - descuentos_totales
 
     diferencia = efectivo_caja - total_esperado
 
-    # Si hay descuadre (mayor a 1 centavo por redondeo decimal), bloqueamos el guardado
+    # Si hay descuadre (mayor a 1 centavo), bloqueamos el guardado
     if abs(diferencia) > 0.01:
         return jsonify({
             'success': False, 
@@ -766,7 +795,7 @@ def procesar_cierre():
                 )
                 db.session.add(detalle)
 
-                # Registrar salida por ventas si el modelo Movimiento existe en tu entorno
+                # Registrar movimientos y actualizar stock...
                 if vendidos > 0 and 'Movimiento' in globals():
                     mov_salida = Movimiento(
                         producto_id=producto.id,
@@ -778,7 +807,6 @@ def procesar_cierre():
                     )
                     db.session.add(mov_salida)
 
-                # Registrar entrada si el modelo Movimiento existe en tu entorno
                 if entradas > 0 and 'Movimiento' in globals():
                     mov_entrada = Movimiento(
                         producto_id=producto.id,
@@ -790,7 +818,7 @@ def procesar_cierre():
                     )
                     db.session.add(mov_entrada)
 
-                # Actualizar stock en el almacén de área de venta correspondiente
+                # Actualizar stock en el almacén de área de venta
                 stock_actualizado = False
                 for s in producto.stocks:
                     if s.almacen and s.almacen.es_area_venta:
@@ -880,8 +908,32 @@ def obtener_detalle_cierre(id_cierre):
 
     cierre = CierreDia.query.get_or_404(id_cierre)
     detalles = []
+    
+    ganancias_por_propietario = {}
+    ventas_brutas_por_propietario = {}
+    descuentos_por_propietario = {}  # <-- Para almacenar las deducciones explicadas
 
     for d in cierre.detalles:
+        producto = Producto.query.get(d.producto_id)
+        precio_costo = producto.precio_costo if producto else 0.0
+        
+        propietario_nombre = "Sin Propietario"
+        if producto and producto.propietario:
+            propietario_nombre = producto.propietario.nombre
+
+        ganancia_item = d.vendidos * (d.precio_venta - precio_costo)
+        venta_bruta_item = d.subtotal
+
+        if propietario_nombre not in ganancias_por_propietario:
+            ganancias_por_propietario[propietario_nombre] = 0.0
+            descuentos_por_propietario[propietario_nombre] = {"tipo": None, "monto": 0.0}
+            
+        ganancias_por_propietario[propietario_nombre] += ganancia_item
+
+        if propietario_nombre not in ventas_brutas_por_propietario:
+            ventas_brutas_por_propietario[propietario_nombre] = 0.0
+        ventas_brutas_por_propietario[propietario_nombre] += venta_bruta_item
+
         detalles.append({
             'nombre_producto': d.nombre_producto,
             'precio_venta': d.precio_venta,
@@ -891,6 +943,27 @@ def obtener_detalle_cierre(id_cierre):
             'vendidos': d.vendidos,
             'subtotal': d.subtotal
         })
+
+    # APLICAR DESCUENTOS ESPECÍFICOS Y REGISTRARLOS
+    for propietario_nombre in ganancias_por_propietario:
+        nombre_lower = propietario_nombre.strip().lower()
+        
+        if "cristian" in nombre_lower:
+            descuento = 1000.0
+            ganancias_por_propietario[propietario_nombre] -= descuento
+            descuentos_por_propietario[propietario_nombre] = {
+                "label": "Salario", 
+                "monto": descuento
+            }
+            
+        elif "dayana" in nombre_lower:
+            venta_dayana = ventas_brutas_por_propietario.get(propietario_nombre, 0.0)
+            descuento = venta_dayana * 0.03
+            ganancias_por_propietario[propietario_nombre] -= descuento
+            descuentos_por_propietario[propietario_nombre] = {
+                "label": "Comisión 3%", 
+                "monto": descuento
+            }
 
     return jsonify({
         'success': True,
@@ -902,9 +975,11 @@ def obtener_detalle_cierre(id_cierre):
             'efectivo_caja': cierre.efectivo_caja,
             'diferencia': cierre.diferencia
         },
-        'detalles': detalles
+        'detalles': detalles,
+        'ganancias_propietarios': ganancias_por_propietario,
+        'ventas_brutas_propietarios': ventas_brutas_por_propietario,
+        'descuentos_propietarios': descuentos_por_propietario  # <-- Enviamos los detalles de las deducciones
     })
-
 # -----------------------------------------------------------------#
 # CUENTAS POR PAGAR
 # -----------------------------------------------------------------#

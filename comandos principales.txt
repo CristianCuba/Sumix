@@ -11,7 +11,7 @@ git add .
 2. Guardar el estado local con un mensaje claro
 Bash
 
-git commit -m "modulo de compras agregado"
+git commit -m "cierre del dia arreglado"
 
 3. Subir las actualizaciones a GitHub
 Bash
