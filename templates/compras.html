@@ -463,18 +463,18 @@
         function enviarCompraWhatsApp() {
                 if (!compraSeleccionadaActual) return;
 
-                let mensaje = `📋 *PLANIFICACIÓN DE COMPRA* \n`;
+                let mensaje = `📋 *SUMIX* \n`;
                 mensaje += `📅 Fecha: ${compraSeleccionadaActual.fecha}\n`;
-                mensaje += `💵 Efectivo en mano: $${compraSeleccionadaActual.efectivo_inicial.toFixed(2)}\n`;
                 mensaje += `-----------------------------------\n\n`;
 
                 compraSeleccionadaActual.por_proveedor.forEach(prov => {
                     mensaje += `🏢 *PROVEEDOR: ${prov.proveedor.toUpperCase()}*\n`;
-                    mensaje += `💰 *Total a Pagar: $${prov.total_proveedor.toFixed(2)}*\n`;
                     mensaje += `Productos:\n`;
+                  
                     prov.productos.forEach(prod => {
-                        mensaje += `  ▪️ ${prod.producto} (Cant: ${prod.cantidad}) - $${prod.subtotal.toFixed(2)}\n`;
+                        mensaje += `  ▪️ ${prod.producto} (Cant: ${prod.cantidad})($: ${prod.precio}) - $${prod.subtotal.toFixed(2)}\n`;
                     });
+                    mensaje += `💰 *Total a Pagar: $${prov.total_proveedor.toFixed(2)}*\n`;
                     mensaje += `\n-----------------------------------\n\n`;
                 });
 

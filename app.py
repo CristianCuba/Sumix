@@ -733,7 +733,7 @@ def procesar_cierre():
             'message': f'La caja no cuadra. Hay una diferencia de ${diferencia:.2f}. El cierre fue rechazado.'
         }), 400
 
-    # 2. PROCESAR CIERRO EN BD (Tu código actual)
+    # 2. PROCESAR CIERRE EN BD
     try:
         nuevo_cierre = CierreDia(
             usuario_nombre=session.get('nombre', session.get('user')),
@@ -766,7 +766,8 @@ def procesar_cierre():
                 )
                 db.session.add(detalle)
 
-                if vendidos > 0:
+                # Registrar salida por ventas si el modelo Movimiento existe en tu entorno
+                if vendidos > 0 and 'Movimiento' in globals():
                     mov_salida = Movimiento(
                         producto_id=producto.id,
                         tipo_movimiento='salida',
@@ -777,7 +778,8 @@ def procesar_cierre():
                     )
                     db.session.add(mov_salida)
 
-                if entradas > 0:
+                # Registrar entrada si el modelo Movimiento existe en tu entorno
+                if entradas > 0 and 'Movimiento' in globals():
                     mov_entrada = Movimiento(
                         producto_id=producto.id,
                         tipo_movimiento='entrada',
@@ -788,8 +790,31 @@ def procesar_cierre():
                     )
                     db.session.add(mov_entrada)
 
-                # Actualizar stock para el nuevo turno
-                producto.stock_venta = stock_final
+                # Actualizar stock en el almacén de área de venta correspondiente
+                stock_actualizado = False
+                for s in producto.stocks:
+                    if s.almacen and s.almacen.es_area_venta:
+                        s.cantidad = stock_final
+                        stock_actualizado = True
+                        break
+                
+                if not stock_actualizado:
+                    almacen_venta = Almacen.query.filter_by(es_area_venta=True).first()
+                    if almacen_venta:
+                        stock_almacen = StockAlmacen.query.filter_by(
+                            producto_id=producto.id, 
+                            almacen_id=almacen_venta.id
+                        ).first()
+                        
+                        if stock_almacen:
+                            stock_almacen.cantidad = stock_final
+                        else:
+                            nuevo_stock_alm = StockAlmacen(
+                                producto_id=producto.id,
+                                almacen_id=almacen_venta.id,
+                                cantidad=stock_final
+                            )
+                            db.session.add(nuevo_stock_alm)
 
         db.session.commit()
         return jsonify({'success': True, 'message': 'Cierre del día completado con éxito'})

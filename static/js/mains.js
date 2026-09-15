@@ -522,7 +522,38 @@ function cerrarModalDetalleCierre() {
         modal.classList.add('hidden');
     }
 }
+// ==========================================
+// VALIDACIÓN DEL CIERRE DE CAJA
+// ==========================================
+function validarCierreCaja(totalEsperado) {
+    const elDineroCaja = document.getElementById('dinero-caja');
+    const btnCierre = document.getElementById('btn-cierre');
 
+    if (!elDineroCaja || !btnCierre) return;
+
+    const efectivoCaja = parseFloat(elDineroCaja.value) || 0;
+    
+    // Aquí defines tu lógica de validación: 
+    // Por ejemplo, que el efectivo ingresado sea mayor a 0 y que coincida exactamente (o con margen de diferencia)
+    // O simplemente habilitarlo cuando el usuario haya introducido el dinero en caja y haya ventas.
+    const hasDineroIngresado = efectivoCaja > 0;
+    const hayVentas = totalEsperado >= 0;
+
+    // Puedes ajustar esta condición si exigías que el efectivo fuera exactamente igual al esperado:
+    // const esIgual = Math.abs(efectivoCaja - totalEsperado) < 0.01;
+
+    if (hasDineroIngresado && hayVentas) {
+        // Habilitar botón de cierre
+        btnCierre.disabled = false;
+        btnCierre.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+        btnCierre.classList.add('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
+    } else {
+        // Bloquear botón de cierre
+        btnCierre.disabled = true;
+        btnCierre.classList.remove('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
+        btnCierre.classList.add('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+    }
+}
 
 // ==========================================
 // UTILIDADES
