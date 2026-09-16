@@ -1,4 +1,3 @@
-
 // ==========================================
 // MODAL DE PRODUCTOS
 // ==========================================
@@ -22,7 +21,6 @@ function cerrarModalProducto() {
 // MODAL DE EDICIÓN DE PRODUCTOS
 // ==========================================
 function abrirModalEditarProducto(btn) {
-    // 1. Obtener los atributos data- del botón
     const id = btn.getAttribute('data-id');
     const nombre = btn.getAttribute('data-nombre');
     const unidad = btn.getAttribute('data-unidad');
@@ -35,10 +33,8 @@ function abrirModalEditarProducto(btn) {
     const form = document.getElementById('form-editar-producto');
 
     if (modal && form) {
-        // Asignar el endpoint de actualización con el ID del producto
         form.action = `/editar_producto/${id}`;
 
-        // Rellenar cada campo del formulario
         if (document.getElementById('edit_nombre')) document.getElementById('edit_nombre').value = nombre || '';
         if (document.getElementById('edit_unidad_medida')) document.getElementById('edit_unidad_medida').value = unidad || 'u';
         if (document.getElementById('edit_precio_costo')) document.getElementById('edit_precio_costo').value = costo || '0';
@@ -46,7 +42,6 @@ function abrirModalEditarProducto(btn) {
         if (document.getElementById('edit_proveedor_id')) document.getElementById('edit_proveedor_id').value = proveedorId || '';
         if (document.getElementById('edit_fecha_vencimiento')) document.getElementById('edit_fecha_vencimiento').value = fechaVenc || '';
 
-        // Mostrar el modal
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     }
@@ -60,25 +55,13 @@ function cerrarModalEditarProducto() {
     }
 }
 
-function cerrarModalEditarProducto() {
-    const modal = document.getElementById('modal-editar-producto');
-    if (modal) {
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-    }
-}
 function filtrarTablaProductos() {
     const input = document.getElementById('filtro-productos');
     const filter = input.value.toLowerCase().trim();
-    
-    // Selecciona todas las filas dentro del tbody de la tabla
     const filas = document.querySelectorAll('tbody tr');
 
     filas.forEach(fila => {
-        // Obtiene todo el texto visible de la fila (nombre, proveedor, etc.)
         const textoFila = fila.textContent.toLowerCase();
-
-        // Oculta o muestra la fila según coincida con la búsqueda
         if (textoFila.includes(filter)) {
             fila.style.display = '';
         } else {
@@ -87,8 +70,7 @@ function filtrarTablaProductos() {
     });
 }
 
-
-// Declaraciones al inicio (solo una vez)
+// Declaraciones al inicio
 var mapaStock = {};
 var productoSeleccionadoId = null;
 
@@ -108,14 +90,11 @@ function abrirModalTraslado(id, nombre) {
     if (campoNombre) campoNombre.textContent = 'Producto: ' + nombre;
     if (modal) modal.classList.remove('hidden');
 
-    // Inicializar selectores de conceptos y comportamiento
     if (typeof actualizarConceptos === 'function') actualizarConceptos();
     if (typeof cambiarTipoOperacion === 'function') cambiarTipoOperacion();
 
-    // AUTO-SELECCIONAR el almacén que tenga stock disponible para evitar enviar un ID incorrecto
     if (selectorOrigen && window.mapaStock && window.mapaStock[productoSeleccionadoId]) {
         const stockProducto = window.mapaStock[productoSeleccionadoId];
-        // Buscar el primer almacén con stock > 0
         const almacenConStock = Object.keys(stockProducto).find(almId => stockProducto[almId] > 0);
         
         if (almacenConStock) {
@@ -162,8 +141,6 @@ function cambiarTipoOperacion() {
     if (!selectTipo) return;
 
     const selectedOption = selectTipo.options[selectTipo.selectedIndex];
-    
-    // Leemos los atributos booleanos que definiste en la base de datos
     const requiereOrigen = selectedOption.getAttribute('data-requiere-origen') === 'true';
     const requiereDestino = selectedOption.getAttribute('data-requiere-destino') === 'true';
 
@@ -174,7 +151,6 @@ function cambiarTipoOperacion() {
 
     if (!contenedorOrigen || !contenedorDestino) return;
 
-    // Manejo dinámico del Origen
     if (requiereOrigen) {
         contenedorOrigen.style.display = 'block';
         if (inputOrigen) inputOrigen.required = true;
@@ -184,7 +160,6 @@ function cambiarTipoOperacion() {
         if (inputOrigen) inputOrigen.required = false;
     }
 
-    // Manejo dinámico del Destino
     if (requiereDestino) {
         contenedorDestino.style.display = 'block';
         if (inputDestino) inputDestino.required = true;
@@ -192,24 +167,6 @@ function cambiarTipoOperacion() {
         contenedorDestino.style.display = 'none';
         if (inputDestino) inputDestino.required = false;
     }
-}
-
-function actualizarStockDisponible() {
-    if (!productoSeleccionadoId) return;
-
-    const selectorOrigen = document.getElementById('modalAlmacenOrigen');
-    const textoStock = document.getElementById('stockDisponibleText');
-
-    if (!selectorOrigen || !textoStock) return;
-
-    const almacenId = selectorOrigen.value;
-    const stockProducto = (window.mapaStock && window.mapaStock[productoSeleccionadoId]) || {};
-    const cantidadDisponible = stockProducto[almacenId] ?? stockProducto[parseInt(almacenId)] ?? 0;
-
-    textoStock.textContent = `Disponible: ${cantidadDisponible}`;
-    textoStock.className = cantidadDisponible <= 0 
-        ? "text-xs font-mono font-bold text-rose-500" 
-        : "text-xs font-mono font-bold text-emerald-400";
 }
 
 function cerrarModalTraslado() {
@@ -227,8 +184,6 @@ function actualizarStockDisponible() {
     if (!selectorOrigen || !textoStock) return;
 
     const almacenId = selectorOrigen.value;
-    
-    // Aseguramos conversión de tipos por si las claves del objeto son numéricas y el value es string
     const stockProducto = mapaStock[productoSeleccionadoId] || {};
     const cantidadDisponible = stockProducto[almacenId] ?? stockProducto[parseInt(almacenId)] ?? 0;
 
@@ -241,12 +196,10 @@ function actualizarStockDisponible() {
     }
 }
 
-
 // ==========================================
 // CONTROL DEL CIERRE DE DÍA Y ARQUEO DE CAJA
 // ==========================================
 
-// Búsqueda / Filtrado dinámico de productos en la tabla de cierre
 function filtrarProductos() {
     const inputBuscador = document.getElementById('buscador');
     if (!inputBuscador) return;
@@ -261,171 +214,197 @@ function filtrarProductos() {
     });
 }
 
-// Recálculo dinámico de ventas, subtotales y habilitación del botón de cierre
 function calcular() {
-        let totalBruto = 0;
-        let ventasDayana = 0;
-        let tieneCristian = false;
+    let totalBrutoGeneral = 0;
+    let ventasDayana = 0;
+    let tieneCristian = false;
 
-        const filas = document.querySelectorAll('.fila-producto');
-        let productosData = [];
+    const filas = document.querySelectorAll('.fila-producto');
 
-        filas.forEach(fila => {
-            const id = fila.getAttribute('data-id');
-            const precio = parseFloat(fila.getAttribute('data-precio')) || 0;
-            const stockInicial = parseFloat(fila.querySelector('.stock-inicial').value) || 0;
-            const entradas = parseFloat(fila.querySelector('.entradas').value) || 0;
-            const stockFinal = parseFloat(fila.querySelector('.stock-final').value) || 0;
+    filas.forEach(fila => {
+        const precioAttr = fila.getAttribute('data-precio') || "0";
+        const precio = parseFloat(precioAttr.replace(',', '.')) || 0;
 
-            let vendidos = (stockInicial + entradas) - stockFinal;
-            if (vendidos < 0) vendidos = 0;
+        const inputInicial = fila.querySelector('.stock-inicial');
+        const inputEntradas = fila.querySelector('.entradas');
+        const inputFinal = fila.querySelector('.stock-final');
 
-            const subtotal = vendidos * precio;
-            totalBruto += subtotal;
+        const stockInicial = inputInicial ? (parseFloat(inputInicial.value) || 0) : 0;
+        const entradas = inputEntradas ? (parseFloat(inputEntradas.value) || 0) : 0;
+        const stockFinal = inputFinal ? (parseFloat(inputFinal.value) || 0) : 0;
 
-            // Leer datos del propietario inyectados en la fila
-            const propId = parseInt(fila.getAttribute('data-propietario-id')) || 0;
-            const propNombre = (fila.getAttribute('data-propietario-nombre') || "").toLowerCase();
+        let vendidos = (stockInicial + entradas) - stockFinal;
+        if (vendidos < 0) vendidos = 0;
 
-            if (propId === 1 || propNombre.includes('dayana')) {
-                ventasDayana += subtotal;
-            }
-            if (propId === 2 || propNombre.includes('cristian')) {
-                tieneCristian = true;
-            }
+        const subtotal = vendidos * precio;
+        totalBrutoGeneral += subtotal;
 
-            fila.querySelector('.vendidos').textContent = vendidos;
-            fila.querySelector('.subtotal').textContent = `$${subtotal.toFixed(2)}`;
+        const propId = parseInt(fila.getAttribute('data-propietario-id')) || 0;
+        const propNombre = (fila.getAttribute('data-propietario-nombre') || "").toLowerCase();
 
-            productosData.push({
-                id: id,
-                entradas: entradas,
-                stock_final: stockFinal,
-                vendidos: vendidos,
-                subtotal: subtotal
-            });
-        });
+        if (propId === 1 || propNombre.includes('dayana')) {
+            ventasDayana += subtotal;
+        }
+        if (propId === 2 || propNombre.includes('cristian')) {
+            tieneCristian = true;
+        }
 
-        // Calcular montos de descuento
-        let descuentoCristian = tieneCristian ? 1000.0 : 0.0;
-        let comisionDayana = ventasDayana * 0.03;
-        let descuentoTotal = descuentoCristian + comisionDayana;
+        const spanVendidos = fila.querySelector('.vendidos');
+        const spanSubtotal = fila.querySelector('.subtotal');
+        
+        if (spanVendidos) spanVendidos.textContent = vendidos;
+        if (spanSubtotal) spanSubtotal.textContent = `$${subtotal.toFixed(2)}`;
+    });
 
-        let totalEsperado = totalBruto - descuentoTotal;
-        if (totalEsperado < 0) totalEsperado = 0;
+    let descuentoCristian = tieneCristian ? 1000.0 : 0.0;
+    let comisionDayana = ventasDayana * 0.03;
+    let descuentoTotal = descuentoCristian + comisionDayana;
 
-        // Actualizar textos en pantalla para el dependiente
-        document.getElementById('total-esperado').textContent = `$${totalEsperado.toFixed(2)}`;
-        document.getElementById('txt-comision-dayana').textContent = `$${comisionDayana.toFixed(2)}`;
+    const inputTransferencia = document.getElementById('dinero-transferencia');
+    const totalTransferencias = inputTransferencia ? (parseFloat(inputTransferencia.value) || 0) : 0;
 
+    const totalDeudas = listaDeudas.reduce((acc, item) => acc + item.subtotal, 0);
+
+    let totalEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias - totalDeudas;
+
+    const elemTotalEsperado = document.getElementById('total-esperado');
+    const elemComisionDayana = document.getElementById('txt-comision-dayana');
+
+    if (elemTotalEsperado) {
+        if (totalEsperado < 0) {
+            elemTotalEsperado.textContent = `-$${Math.abs(totalEsperado).toFixed(2)}`;
+        } else {
+            elemTotalEsperado.textContent = `$${totalEsperado.toFixed(2)}`;
+        }
+    }
+
+    if (elemComisionDayana) {
+        elemComisionDayana.textContent = `$${comisionDayana.toFixed(2)}`;
+    }
+
+    if (typeof validarCierreCaja === 'function') {
         validarCierreCaja(totalEsperado);
     }
+}
+
+async function enviarCierre() {
+    const efectivoCaja = parseFloat(document.getElementById('dinero-caja').value) || 0;
+    const totalTransferencias = parseFloat(document.getElementById('dinero-transferencia').value) || 0;
+    const filas = document.querySelectorAll('.fila-producto');
+    let productos = [];
+
+    filas.forEach(fila => {
+        productos.push({
+            id: fila.getAttribute('data-id'),
+            entradas: parseFloat(fila.querySelector('.entradas').value) || 0,
+            stock_final: parseFloat(fila.querySelector('.stock-final').value) || 0,
+            vendidos: parseFloat(fila.querySelector('.vendidos').textContent) || 0,
+            subtotal: parseFloat(fila.querySelector('.subtotal').textContent.replace('$', '')) || 0
+        });
+    });
+
+    try {
+        const response = await fetch('/procesar_cierre', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                efectivo_caja: efectivoCaja, 
+                total_transferencias: totalTransferencias, 
+                productos: productos,
+                deudas: listaDeudas 
+            })
+        });
+
+        const res = await response.json();
+        if (res.success) {
+            alert(res.message);
+            window.location.reload();
+        } else {
+            alert(res.message);
+        }
+    } catch (err) {
+        console.error("Error:", err);
+        alert("Ocurrió un error al procesar el cierre.");
+    }
+}
 
 let listaDeudas = [];
 
-    function agregarDeuda() {
-        const selectProd = document.getElementById('deuda-producto-select');
-        const opcionSelected = selectProd.options[selectProd.selectedIndex];
+function agregarDeuda() {
+    const selectProd = document.getElementById('deuda-producto-select');
+    if (!selectProd || selectProd.options.length === 0) return;
+    
+    const opcionSelected = selectProd.options[selectProd.selectedIndex];
 
-        const productoId = selectProd.value;
-        const productoNombre = opcionSelected.getAttribute('data-nombre');
-        const precioVenta = parseFloat(opcionSelected.getAttribute('data-precio')) || 0;
+    const productoId = selectProd.value;
+    const productoNombre = opcionSelected.getAttribute('data-nombre');
+    const precioVenta = parseFloat(opcionSelected.getAttribute('data-precio')) || 0;
 
-        const conceptoInput = document.getElementById('deuda-concepto');
-        const concepto = conceptoInput.value.trim() || "Consumo Personal / Dueño";
+    const conceptoInput = document.getElementById('deuda-concepto');
+    const concepto = conceptoInput.value.trim() || "Consumo Personal / Dueño";
 
-        const cantidadInput = document.getElementById('deuda-cantidad');
-        const cantidad = parseFloat(cantidadInput.value) || 0;
+    const cantidadInput = document.getElementById('deuda-cantidad');
+    const cantidad = parseFloat(cantidadInput.value) || 0;
 
-        if (cantidad <= 0) {
-            alert("La cantidad debe ser mayor a 0");
-            return;
-        }
-
-        // Añadir al array temporal
-        listaDeudas.push({
-            id: Date.now(),
-            productoId: productoId,
-            productoNombre: productoNombre,
-            concepto: concepto,
-            cantidad: cantidad,
-            subtotal: cantidad * precioVenta
-        });
-
-        // Limpiar inputs de deudas
-        conceptoInput.value = "";
-        cantidadInput.value = "1";
-
-        renderizarDeudas();
-        calcular();
+    if (cantidad <= 0) {
+        alert("La cantidad debe ser mayor a 0");
+        return;
     }
 
-    function eliminarDeuda(id) {
-        listaDeudas = listaDeudas.filter(item => item.id !== id);
-        renderizarDeudas();
-        calcular();
+    listaDeudas.push({
+        id: Date.now(),
+        productoId: productoId,
+        productoNombre: productoNombre,
+        concepto: concepto,
+        cantidad: cantidad,
+        subtotal: cantidad * precioVenta
+    });
+
+    conceptoInput.value = "";
+    cantidadInput.value = "1";
+
+    renderizarDeudas();
+    calcular();
+}
+
+function eliminarDeuda(id) {
+    listaDeudas = listaDeudas.filter(item => item.id !== id);
+    renderizarDeudas();
+    calcular();
+}
+
+function renderizarDeudas() {
+    const container = document.getElementById('tabla-deudas-container');
+    const badgeDeudas = document.getElementById('total-deudas-badge');
+
+    const totalDeudas = listaDeudas.reduce((acc, item) => acc + item.subtotal, 0);
+    if (badgeDeudas) {
+        badgeDeudas.textContent = `Total Deudas: $${totalDeudas.toFixed(2)}`;
     }
 
-    function renderizarDeudas() {
-        const container = document.getElementById('tabla-deudas-container');
+    if (!container) return;
 
-        if (listaDeudas.length === 0) {
-            container.innerHTML = `<tr id="sin-deudas-row"><td colspan="5" class="py-4 text-center text-gray-500 italic">No hay apuntes o deudas registradas en este turno.</td></tr>`;
-            return;
-        }
-
-        let html = '';
-        listaDeudas.forEach(item => {
-            html += `
-                <tr class="hover:bg-gray-800/20">
-                    <td class="py-2.5 px-3 font-medium text-white">${item.concepto}</td>
-                    <td class="py-2.5 px-3 text-gray-300">${item.productoNombre}</td>
-                    <td class="py-2.5 px-3 text-center font-mono text-orange-400">${item.cantidad}</td>
-                    <td class="py-2.5 px-3 text-right font-mono text-white">$${item.subtotal.toFixed(2)}</td>
-                    <td class="py-2.5 px-3 text-center">
-                        <button type="button" onclick="eliminarDeuda(${item.id})" class="text-rose-400 hover:text-rose-300 font-bold px-2 py-1 rounded bg-rose-500/10 hover:bg-rose-500/20 transition">Quitar</button>
-                    </td>
-                </tr>
-            `;
-        });
-        container.innerHTML = html;
-    }
-// Envío de la liquidación del cierre al backend vía fetch()
-async function enviarCierre() {
-        const efectivoCaja = parseFloat(document.getElementById('dinero-caja').value) || 0;
-        const filas = document.querySelectorAll('.fila-producto');
-        let productos = [];
-
-        filas.forEach(fila => {
-            productos.push({
-                id: fila.getAttribute('data-id'),
-                entradas: parseFloat(fila.querySelector('.entradas').value) || 0,
-                stock_final: parseFloat(fila.querySelector('.stock-final').value) || 0,
-                vendidos: parseFloat(fila.querySelector('.vendidos').textContent) || 0,
-                subtotal: parseFloat(fila.querySelector('.subtotal').textContent.replace('$', '')) || 0
-            });
-        });
-
-        try {
-            const response = await fetch('/procesar_cierre', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ efectivo_caja: efectivoCaja, productos: productos })
-            });
-
-            const res = await response.json();
-            if (res.success) {
-                alert(res.message);
-                window.location.reload();
-            } else {
-                alert(res.message);
-            }
-        } catch (err) {
-            console.error("Error:", err);
-            alert("Ocurrió un error al procesar el cierre.");
-        }
+    if (listaDeudas.length === 0) {
+        container.innerHTML = `<tr id="sin-deudas-row"><td colspan="5" class="py-4 text-center text-gray-500 italic">No hay apuntes o deudas registradas en este turno.</td></tr>`;
+        return;
     }
 
+    let html = '';
+    listaDeudas.forEach(item => {
+        html += `
+            <tr class="hover:bg-gray-800/20">
+                <td class="py-2.5 px-3 font-medium text-white">${item.concepto}</td>
+                <td class="py-2.5 px-3 text-gray-300">${item.productoNombre}</td>
+                <td class="py-2.5 px-3 text-center font-mono text-orange-400">${item.cantidad}</td>
+                <td class="py-2.5 px-3 text-right font-mono text-white">$${item.subtotal.toFixed(2)}</td>
+                <td class="py-2.5 px-3 text-center">
+                    <button type="button" onclick="eliminarDeuda(${item.id})" class="text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition">Quitar</button>
+                </td>
+            </tr>
+        `;
+    });
+    container.innerHTML = html;
+} // <-- ¡FALTABA ESTA LLAVE DE CIERRE QUE ROMPÍA TODO EL SCRIPT!
 
 // ==========================================
 // CONSULTA Y MODAL DE DETALLE DE CIERRE
@@ -446,7 +425,6 @@ async function verDetalleCierre(idCierre) {
         const ventasBrutasPropietarios = res.ventas_brutas_propietarios || {};
         const descuentosPropietarios = res.descuentos_propietarios || {};
 
-        // Cargar encabezados
         document.getElementById('modal-cierre-titulo').textContent = `Detalle del Cierre #${cierre.id}`;
         document.getElementById('modal-cierre-subtitulo').textContent = `Fecha: ${cierre.fecha} | Responsable: ${cierre.usuario_nombre}`;
         document.getElementById('modal-total-esperado').textContent = `$${cierre.total_esperado.toFixed(2)}`;
@@ -464,7 +442,6 @@ async function verDetalleCierre(idCierre) {
             elDif.className = "text-xl font-bold font-mono text-gray-400";
         }
 
-        // RENDERIZAR MÉTRICAS Y DESCUENTOS POR PROPIETARIO
         const contenedorPropietarios = document.getElementById('modal-ganancias-propietarios');
         contenedorPropietarios.innerHTML = '';
 
@@ -479,7 +456,6 @@ async function verDetalleCierre(idCierre) {
                 const gananciaFinal = gananciasPropietarios[propietario] || 0.0;
                 const infoDescuento = descuentosPropietarios[propietario];
 
-                // Construimos HTML opcional si tiene deducción/descuento
                 let htmlDescuento = '';
                 if (infoDescuento && infoDescuento.label) {
                     htmlDescuento = `
@@ -511,7 +487,6 @@ async function verDetalleCierre(idCierre) {
             contenedorPropietarios.innerHTML = `<span class="text-xs text-gray-500 col-span-full">No hay registros de propietarios.</span>`;
         }
 
-        // Llenar tabla de productos
         const tbody = document.getElementById('modal-tabla-detalles');
         tbody.innerHTML = '';
 
@@ -530,7 +505,6 @@ async function verDetalleCierre(idCierre) {
             tbody.appendChild(tr);
         });
 
-        // Abrir Modal
         const modal = document.getElementById('modal-detalle-cierre');
         if (modal) {
             modal.classList.remove('hidden');
@@ -542,6 +516,7 @@ async function verDetalleCierre(idCierre) {
         alert("Ocurrió un error al obtener el detalle del cierre.");
     }
 }
+
 function cerrarModalDetalleCierre() {
     const modal = document.getElementById('modal-detalle-cierre');
     if (modal) {
@@ -549,29 +524,30 @@ function cerrarModalDetalleCierre() {
         modal.classList.add('hidden');
     }
 }
+
 // ==========================================
 // VALIDACIÓN DEL CIERRE DE CAJA
 // ==========================================
 function validarCierreCaja(totalEsperado) {
-        const elDineroCaja = document.getElementById('dinero-caja');
-        const btnCierre = document.getElementById('btn-cierre');
+    const elDineroCaja = document.getElementById('dinero-caja');
+    const btnCierre = document.getElementById('btn-cierre');
 
-        if (!elDineroCaja || !btnCierre) return;
+    if (!elDineroCaja || !btnCierre) return;
 
-        const efectivoCaja = parseFloat(elDineroCaja.value) || 0;
-        const hasDineroIngresado = efectivoCaja > 0;
-        const hayVentas = totalEsperado >= 0;
+    const efectivoCaja = parseFloat(elDineroCaja.value) || 0;
+    const hasDineroIngresado = efectivoCaja > 0;
+    const hayVentas = totalEsperado >= 0;
 
-        if (hasDineroIngresado && hayVentas) {
-            btnCierre.disabled = false;
-            btnCierre.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
-            btnCierre.classList.add('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
-        } else {
-            btnCierre.disabled = true;
-            btnCierre.classList.remove('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
-            btnCierre.classList.add('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
-        }
+    if (hasDineroIngresado && hayVentas) {
+        btnCierre.disabled = false;
+        btnCierre.classList.remove('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
+        btnCierre.classList.add('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
+    } else {
+        btnCierre.disabled = true;
+        btnCierre.classList.remove('bg-orange-600', 'hover:bg-orange-500', 'text-white', 'cursor-pointer');
+        btnCierre.classList.add('bg-gray-800', 'text-gray-500', 'cursor-not-allowed');
     }
+}
 
 // ==========================================
 // UTILIDADES
@@ -584,6 +560,7 @@ function actualizarNombreArchivo(input) {
         label.textContent = "Seleccionar archivo .db";
     }
 }
+
 function calcularSugerenciaVenta() {
     const inputCosto = document.getElementById('precio_costo');
     const inputVenta = document.getElementById('precio_venta');
@@ -596,7 +573,6 @@ function calcularSugerenciaVenta() {
     if (costo > 0) {
         const sugerido = (costo * 1.30).toFixed(2);
         
-        // Asigna la sugerencia si el campo de venta está vacío o es 0
         if (!inputVenta.value || parseFloat(inputVenta.value) === 0) {
             inputVenta.value = sugerido;
         }
@@ -615,12 +591,10 @@ function calcularSugerenciaVenta() {
 // INICIALIZACIÓN DE EVENTOS AL CARGAR EL DOM
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-       // 2. Escuchador para el buscador de productos en cierre
     const inputBuscador = document.getElementById('buscador');
     if (inputBuscador) {
         inputBuscador.addEventListener('keyup', filtrarProductos);
     }
 
-    // 3. Ejecutar cálculo inicial si estamos en la vista de cierre
     calcular();
 });

@@ -117,13 +117,20 @@ class Producto(db.Model):
         return 0.0
 
 
+from sqlalchemy.ext.hybrid import hybrid_property # Asegúrate de importarlo si no lo tienes, o usa este bloque directo:
+
 class Usuario(db.Model):
-    __tablename__ = 'usuarios'
+    __tablename__ = 'usuarios'  # <-- ¡Aquí está la clave, en plural!
+    
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(200), nullable=False)
     nombre = db.Column(db.String(100), nullable=False)
-    rol = db.Column(db.String(20), default='dependiente')
+    rol = db.Column(db.String(50), nullable=False)  # <-- ¡Aquí está tu columna 'rol'!
+    
+    # Relación de almacenes si la necesitas
+    almacen_id = db.Column(db.Integer, db.ForeignKey('almacenes.id'), nullable=True)
+    almacen = db.relationship('Almacen', backref='usuarios')
 
 
 class CierreDia(db.Model):
@@ -134,8 +141,22 @@ class CierreDia(db.Model):
     usuario_nombre = db.Column(db.String(100), nullable=False)
     total_esperado = db.Column(db.Float, default=0.0)
     efectivo_caja = db.Column(db.Float, default=0.0)
+    total_transferencias = db.Column(db.Float, default=0.0)
+    total_deudas = db.Column(db.Float, default=0.0) # <--- Nuevo campo para el total de deudas
     diferencia = db.Column(db.Float, default=0.0)
     detalles = db.relationship('DetalleCierre', backref='cierre', lazy=True)
+    deudas = db.relationship('DeudaCierre', backref='cierre', lazy=True) # <--- Relación con las deudas del cierre
+
+
+class DeudaCierre(db.Model):
+    __tablename__ = 'deudas_cierre'
+    id = db.Column(db.Integer, primary_key=True)
+    cierre_id = db.Column(db.Integer, db.ForeignKey('cierres_dia.id'), nullable=False)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
+    producto_nombre = db.Column(db.String(100), nullable=False)
+    concepto = db.Column(db.String(150), nullable=False)
+    cantidad = db.Column(db.Float, default=0.0)
+    subtotal = db.Column(db.Float, default=0.0)
 
 
 class DetalleCierre(db.Model):
@@ -464,19 +485,31 @@ def eliminar_proveedor(id):
 
 @app.route('/cierre')
 def vista_cierre():
-    if 'user' not in session:
+    username = session.get('user')
+    usuario_actual = Usuario.query.filter_by(username=username).first()
+    
+    if not usuario_actual:
         return redirect(url_for('login'))
 
-    # ORDENAMIENTO:
-    # 1. case(...) evalúa si el stock_venta es 0. Si es 0 le da prioridad 1, si es > 0 le da prioridad 0.
-    # 2. Luego ordena alfabéticamente por nombre.
-    productos = Producto.query.order_by(
-        case((Producto.stock_venta == 0, 1), else_=0),
-        Producto.nombre.asc()
-    ).all()
+    almacen_id = usuario_actual.almacen_id
+    productos = Producto.query.all()
+    
+    for prod in productos:
+        stock_alm = StockAlmacen.query.filter_by(
+            producto_id=prod.id, 
+            almacen_id=almacen_id
+        ).first()
+        
+        cantidad_actual = stock_alm.cantidad if stock_alm else 0.0
+        
+        prod.stock_en_almacen = cantidad_actual
+        prod.stock_final_inicial = cantidad_actual
 
-    return render_template('cierre.html', productos=productos)
+    # NUEVO: Buscar las deudas registradas en los cierres para que no desaparezcan de la vista
+    # (Si quieres filtrarlas por almacén o mostrar todas las activas, puedes ajustarlo aquí)
+    deudas_pendientes = DeudaCierre.query.all()
 
+    return render_template('cierre.html', productos=productos, deudas_pendientes=deudas_pendientes)
 
 import json
 
@@ -711,68 +744,65 @@ def procesar_cierre():
     if 'user' not in session:
         return jsonify({'success': False, 'message': 'Sesión no iniciada'}), 401
 
+    username = session.get('user')
+    usuario_actual = Usuario.query.filter_by(username=username).first()
+
+    if not usuario_actual or not usuario_actual.almacen_id:
+        return jsonify({'success': False, 'message': 'Error: Tu usuario no tiene un almacén asignado.'}), 400
+
+    almacen_usuario_id = usuario_actual.almacen_id
+
     data = request.get_json()
     if not data:
         return jsonify({'success': False, 'message': 'Datos inválidos'}), 400
 
     efectivo_caja = float(data.get('efectivo_caja', 0.0))
+    total_transferencias = float(data.get('total_transferencias', 0.0))
     productos_cierre = data.get('productos', [])
+    deudas_cierre = data.get('deudas', [])
 
-    # 1. VALIDACIÓN EN BACKEND: Calcular subtotales y deducciones por propietario
-    total_bruto = 0.0
-    ventas_por_propietario = {}
+    total_bruto_general = 0.0
+    ventas_dayana = 0.0
+    tiene_cristian = False
 
     for p_data in productos_cierre:
+        subtotal_prod = float(p_data.get('subtotal', 0.0))
+        total_bruto_general += subtotal_prod
+
         p_id = int(p_data['id'])
-        subtotal = float(p_data.get('subtotal', 0.0))
-        total_bruto += subtotal
-
-        # Consultar producto para identificar al propietario
-        producto = Producto.query.get(p_id)
-        if producto and producto.propietario:
-            prop_nombre = producto.propietario.nombre.strip().lower()
-            prop_id = producto.propietario.id
+        producto_check = Producto.query.get(p_id)
+        if producto_check and producto_check.propietario:
+            prop_nombre = producto_check.propietario.nombre.lower()
+            prop_id = producto_check.propietario.id
             
-            # Agrupamos por nombre/id para aplicar las reglas
-            key = (prop_id, prop_nombre)
-            if key not in ventas_por_propietario:
-                ventas_por_propietario[key] = 0.0
-            ventas_por_propietario[key] += subtotal
+            if prop_id == 1 or 'dayana' in prop_nombre:
+                ventas_dayana += subtotal_prod
+            if prop_id == 2 or 'cristian' in prop_nombre:
+                tiene_cristian = True
 
-    # Calcular los descuentos a restar del efectivo esperado en caja
-    descuentos_totales = 0.0
-    for (prop_id, prop_nombre), venta_val in ventas_por_propietario.items():
-        # Regla para Cristian (Salario fijo de 1000)
-        if "cristian" in prop_nombre or prop_id == 2:
-            descuentos_totales += 1000.0
-        
-        # Regla para Dayana (3% de sus ventas netas/brutas, id 1)
-        elif "dayana" in prop_nombre or prop_id == 1:
-            descuentos_totales += (venta_val * 0.03)
+    total_deudas = sum(float(d.get('subtotal', 0.0)) for d in deudas_cierre)
 
-    # El efectivo esperado final en caja es el total bruto de ventas menos los retiros/salarios correspondientes
-    total_esperado = total_bruto - descuentos_totales
+    descuento_cristian = 1000.0 if tiene_cristian else 0.0
+    comision_dayana = ventas_dayana * 0.03
+    descuento_total = descuento_cristian + comision_dayana
 
+    total_esperado = total_bruto_general - descuento_total - total_transferencias - total_deudas
     diferencia = efectivo_caja - total_esperado
 
-    # Si hay descuadre (mayor a 1 centavo), bloqueamos el guardado
-    if abs(diferencia) > 0.01:
-        return jsonify({
-            'success': False, 
-            'message': f'La caja no cuadra. Hay una diferencia de ${diferencia:.2f}. El cierre fue rechazado.'
-        }), 400
-
-    # 2. PROCESAR CIERRE EN BD
     try:
         nuevo_cierre = CierreDia(
-            usuario_nombre=session.get('nombre', session.get('user')),
+            usuario_id=usuario_actual.id,
+            usuario_nombre=usuario_actual.nombre,
             efectivo_caja=efectivo_caja,
+            total_transferencias=total_transferencias,
+            total_deudas=total_deudas,
             total_esperado=total_esperado,
             diferencia=diferencia
         )
         db.session.add(nuevo_cierre)
         db.session.flush()
 
+        # Guardar detalles de productos vendidos y actualizar stock del almacén
         for p_data in productos_cierre:
             p_id = int(p_data['id'])
             entradas = float(p_data.get('entradas', 0.0))
@@ -782,12 +812,14 @@ def procesar_cierre():
 
             producto = Producto.query.get(p_id)
             if producto:
+                stock_inicial_calculado = stock_final + vendidos - entradas
+                
                 detalle = DetalleCierre(
                     cierre_id=nuevo_cierre.id,
                     producto_id=producto.id,
                     nombre_producto=producto.nombre,
                     precio_venta=producto.precio_venta,
-                    stock_inicial=producto.stock_venta,
+                    stock_inicial=stock_inicial_calculado,
                     entradas=entradas,
                     stock_final=stock_final,
                     vendidos=vendidos,
@@ -795,63 +827,41 @@ def procesar_cierre():
                 )
                 db.session.add(detalle)
 
-                # Registrar movimientos y actualizar stock...
-                if vendidos > 0 and 'Movimiento' in globals():
-                    mov_salida = Movimiento(
-                        producto_id=producto.id,
-                        tipo_movimiento='salida',
-                        concepto='Venta Cierre Día',
-                        cantidad=vendidos,
-                        origen='venta',
-                        destino=None
-                    )
-                    db.session.add(mov_salida)
-
-                if entradas > 0 and 'Movimiento' in globals():
-                    mov_entrada = Movimiento(
-                        producto_id=producto.id,
-                        tipo_movimiento='entrada',
-                        concepto='Entrada Cierre Día',
-                        cantidad=entradas,
-                        origen=None,
-                        destino='venta'
-                    )
-                    db.session.add(mov_entrada)
-
-                # Actualizar stock en el almacén de área de venta
-                stock_actualizado = False
-                for s in producto.stocks:
-                    if s.almacen and s.almacen.es_area_venta:
-                        s.cantidad = stock_final
-                        stock_actualizado = True
-                        break
+                # Actualizar inventario físico en el almacén del usuario
+                stock_almacen = StockAlmacen.query.filter_by(
+                    producto_id=producto.id, 
+                    almacen_id=almacen_usuario_id
+                ).first()
                 
-                if not stock_actualizado:
-                    almacen_venta = Almacen.query.filter_by(es_area_venta=True).first()
-                    if almacen_venta:
-                        stock_almacen = StockAlmacen.query.filter_by(
-                            producto_id=producto.id, 
-                            almacen_id=almacen_venta.id
-                        ).first()
-                        
-                        if stock_almacen:
-                            stock_almacen.cantidad = stock_final
-                        else:
-                            nuevo_stock_alm = StockAlmacen(
-                                producto_id=producto.id,
-                                almacen_id=almacen_venta.id,
-                                cantidad=stock_final
-                            )
-                            db.session.add(nuevo_stock_alm)
+                if stock_almacen:
+                    stock_almacen.cantidad = stock_final
+                else:
+                    nuevo_stock = StockAlmacen(
+                        producto_id=producto.id,
+                        almacen_id=almacen_usuario_id,
+                        cantidad=stock_final
+                    )
+                    db.session.add(nuevo_stock)
+
+        # Guardar deudas asociadas al cierre
+        for d_data in deudas_cierre:
+            deuda = DeudaCierre(
+                cierre_id=nuevo_cierre.id,
+                producto_id=int(d_data.get('producto_id', 0)),
+                producto_nombre=d_data.get('producto_nombre', ''),
+                concepto=d_data.get('concepto', ''),
+                cantidad=float(d_data.get('cantidad', 0.0)),
+                subtotal=float(d_data.get('subtotal', 0.0))
+            )
+            db.session.add(deuda)
 
         db.session.commit()
-        return jsonify({'success': True, 'message': 'Cierre del día completado con éxito'})
+        return jsonify({'success': True, 'message': 'Cierre procesado correctamente'})
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error en procesar_cierre: {e}")
-        return jsonify({'success': False, 'message': f'Error interno: {str(e)}'}), 500
-
+        return jsonify({'success': False, 'message': str(e)}), 500
+    
 @app.route('/editar_producto/<int:id>', methods=['POST'])
 def editar_producto(id):
     if 'user' not in session or session.get('rol') != 'admin':
@@ -1043,7 +1053,8 @@ def vista_usuarios():
         return redirect(url_for('login'))
     
     usuarios = Usuario.query.all()
-    return render_template('admin_usuarios.html', usuarios=usuarios)
+    almacenes = Almacen.query.all()
+    return render_template('admin_usuarios.html', usuarios=usuarios, almacenes=almacenes)
 
 
 @app.route('/admin/usuarios/nuevo', methods=['POST'])
@@ -1055,6 +1066,9 @@ def guardar_usuario():
     nombre = request.form.get('nombre')
     password = request.form.get('password')
     rol = request.form.get('rol')
+    
+    # Capturamos el almacén seleccionado en el formulario (si viene vacío o no seleccionado, será None)
+    almacen_id = request.form.get('almacen_id')
 
     if Usuario.query.filter_by(username=username).first():
         flash("El nombre de usuario ya existe.", "error")
@@ -1064,14 +1078,15 @@ def guardar_usuario():
         username=username,
         nombre=nombre,
         password=password,
-        rol=rol
+        rol=rol,
+        almacen_id=almacen_id if almacen_id else None  # Asignamos el almacén correspondiente
     )
 
     db.session.add(nuevo_user)
     db.session.commit()
 
+    flash("Usuario creado y vinculado al almacén exitosamente.", "success")
     return redirect(url_for('vista_usuarios'))
-
 
 @app.route('/admin/usuarios/eliminar/<int:id>', methods=['POST'])
 def eliminar_usuario(id):
