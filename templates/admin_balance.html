@@ -175,12 +175,19 @@
                 </select>
             </div>
             <div>
+                <label class="text-xs text-gray-400 block mb-1">Método / Destino</label>
+                <select id="mov-metodo" class="w-full bg-[#121316] border border-gray-800 rounded-xl p-2.5 text-white text-xs focus:border-orange-500 outline-none">
+                    <option value="EFECTIVO">Efectivo (Caja Físico)</option>
+                    <option value="TRANSFERENCIA">Transferencia / Tarjeta / Cuenta</option>
+                </select>
+            </div>
+            <div>
                 <label class="text-xs text-gray-400 block mb-1">Monto ($)</label>
                 <input type="number" step="0.01" id="mov-monto" required class="w-full bg-[#121316] border border-gray-800 rounded-xl p-2.5 text-white text-xs focus:border-orange-500 outline-none">
             </div>
             <div>
                 <label class="text-xs text-gray-400 block mb-1">Concepto / Detalle</label>
-                <input type="text" id="mov-concepto" placeholder="Ej: Aporte inicial de inventario, Retiro personal" class="w-full bg-[#121316] border border-gray-800 rounded-xl p-2.5 text-white text-xs focus:border-orange-500 outline-none">
+                <input type="text" id="mov-concepto" placeholder="Ej: Depósito directo a tarjeta, Retiro de caja" class="w-full bg-[#121316] border border-gray-800 rounded-xl p-2.5 text-white text-xs focus:border-orange-500 outline-none">
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="cerrarModal('modal-movimiento')" class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl text-xs font-semibold">Cancelar</button>
@@ -206,6 +213,13 @@
             <div>
                 <label class="text-xs text-gray-400 block mb-1">Nombre de la persona (Deudor)</label>
                 <input type="text" id="pres-deudor" required placeholder="Ej: Juan Pérez" class="w-full bg-[#121316] border border-gray-800 rounded-xl p-2.5 text-white text-xs focus:border-sky-500 outline-none">
+            </div>
+            <div>
+                <label class="text-xs text-gray-400 block mb-1">Método de salida / Origen</label>
+                <select id="pres-metodo" class="w-full bg-[#121316] border border-gray-800 rounded-xl p-2.5 text-white text-xs focus:border-sky-500 outline-none">
+                    <option value="EFECTIVO">Efectivo (Caja Físico)</option>
+                    <option value="TRANSFERENCIA">Transferencia / Tarjeta / Cuenta</option>
+                </select>
             </div>
             <div>
                 <label class="text-xs text-gray-400 block mb-1">Monto Prestado ($)</label>
@@ -241,6 +255,7 @@ async function enviarMovimiento(e) {
     const data = {
         propietario_id: document.getElementById('mov-propietario').value,
         tipo: document.getElementById('mov-tipo').value,
+        metodo_pago: document.getElementById('mov-metodo').value,
         monto: document.getElementById('mov-monto').value,
         concepto: document.getElementById('mov-concepto').value
     };
@@ -259,6 +274,7 @@ async function enviarPrestamo(e) {
     const data = {
         propietario_id: document.getElementById('pres-propietario').value,
         deudor_nombre: document.getElementById('pres-deudor').value,
+        metodo_pago: document.getElementById('pres-metodo').value,
         monto: document.getElementById('pres-monto').value,
         concepto: document.getElementById('pres-concepto').value
     };

@@ -31,9 +31,10 @@ class PrestamoTercero(db.Model):
     deudor_nombre = db.Column(db.String(100), nullable=False)
     monto = db.Column(db.Float, nullable=False)
     saldo_pendiente = db.Column(db.Float, nullable=False)
+    metodo_pago = db.Column(db.String(20), default='EFECTIVO')  # 'EFECTIVO' o 'TRANSFERENCIA'
     concepto = db.Column(db.String(255), nullable=True)
-    fecha = db.Column(db.DateTime, default=db.datetime.utcnow if hasattr(db, 'datetime') else datetime.now)
-    estado = db.Column(db.String(20), default='PENDIENTE') # PENDIENTE, PAGADO
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    estado = db.Column(db.String(20), default='PENDIENTE')
 
     propietario = db.relationship('Propietario', backref=db.backref('prestamos', lazy=True))
 
@@ -68,12 +69,18 @@ class SnapshotBalanceDiario(db.Model):
     patrimonio_total = db.Column(db.Float, default=0.0)
 
 class Compra(db.Model):
+    __tablename__ = 'compra'
     id = db.Column(db.Integer, primary_key=True)
-    fecha = db.Column(db.DateTime, default=datetime.utcnow)
-    efectivo_inicial = db.Column(db.Float, nullable=False)
-    total_compra = db.Column(db.Float, nullable=False)
-    efectivo_restante = db.Column(db.Float, nullable=False)
-    items = db.relationship('ItemCompra', backref='compra', lazy=True, cascade='all, delete-orphan')
+    fecha = db.Column(db.DateTime, default=datetime.now)
+    efectivo_inicial = db.Column(db.Float, default=0.0)
+    total_compra = db.Column(db.Float, default=0.0)
+    efectivo_restante = db.Column(db.Float, default=0.0)
+    
+    # ⚠️ CAMPOS NUEVOS (Añadir estos dos):
+    propietario_id = db.Column(db.Integer, db.ForeignKey('propietarios.id'), nullable=True)
+    metodo_pago = db.Column(db.String(20), default='EFECTIVO')
+
+    items = db.relationship('ItemCompra', backref='compra', lazy=True)
 
 class ItemCompra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -283,29 +290,66 @@ def vista_balance():
         productos_prop = Producto.query.filter_by(propietario_id=prop.id).all()
         inventario_costo = sum((obtener_stock_total(p) * (p.precio_costo or 0.0)) for p in productos_prop)
 
-        # 2. Deudas por Cobrar
+        # 2. Deudas por Cobrar (Consulta SQL directa a deudas_cierre)
         deudas_cobrar = 0.0
-        if 'Deuda' in globals():
-            try:
-                deudas = Deuda.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
-                deudas_cobrar = sum(getattr(d, 'monto_pendiente', d.monto or 0.0) for d in deudas)
-            except Exception:
-                deudas_cobrar = 0.0
+        try:
+            filas_deudas = db.session.execute(
+                db.text("SELECT * FROM deudas_cierre WHERE LOWER(COALESCE(estado, '')) = 'pendiente' OR cierre_pago_id IS NULL")
+            ).mappings().all()
+
+            for row in filas_deudas:
+                # Omitir deudas pagadas o canceladas
+                estado_str = str(row.get('estado', '')).lower()
+                if estado_str == 'pagado' or row.get('cierre_pago_id') is not None:
+                    continue
+
+                monto_d = float(row.get('subtotal') or 0.0)
+                if monto_d <= 0:
+                    continue
+
+                prod_id = row.get('producto_id')
+                prod_nom = str(row.get('producto_nombre') or '').strip()
+
+                prod = None
+                if prod_id and prod_id > 0:
+                    prod = Producto.query.get(prod_id)
+                elif prod_nom:
+                    prod = Producto.query.filter(Producto.nombre.ilike(prod_nom)).first()
+
+                # Si el producto tiene socio, se le asigna a él. Si es concepto general, se asigna a Cristian.
+                if prod and prod.propietario_id == prop.id:
+                    deudas_cobrar += monto_d
+                elif not prod and 'CRISTIAN' in prop.nombre.upper():
+                    deudas_cobrar += monto_d
+        except Exception:
+            deudas_cobrar = 0.0
 
         # 3. Préstamos Otorgados a terceros
         prestamos = PrestamoTercero.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
-        total_prestamos = sum(p.saldo_pendiente for p in prestamos)
+        prestamos_efectivo = sum(p.saldo_pendiente for p in prestamos if not getattr(p, 'metodo_pago', None) or p.metodo_pago == 'EFECTIVO')
+        prestamos_transf = sum(p.saldo_pendiente for p in prestamos if getattr(p, 'metodo_pago', None) == 'TRANSFERENCIA')
+        total_prestamos = prestamos_efectivo + prestamos_transf
 
-        # 4. Inyecciones y Retiros manuales
+        # 4. Movimientos de Capital (Inyecciones / Retiros)
         movs = MovimientoCapital.query.filter_by(propietario_id=prop.id).all()
-        total_inyecciones = sum(m.monto for m in movs if m.tipo == 'INYECCION')
-        total_retiros = sum(m.monto for m in movs if m.tipo == 'RETIRO')
 
-        # 5. Efectivo Acumulado por Cierres y Transferencias
+        inyecciones_efectivo = sum(m.monto for m in movs if m.tipo == 'INYECCION' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO'))
+        retiros_efectivo = sum(m.monto for m in movs if m.tipo == 'RETIRO' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO'))
+
+        inyecciones_transf = sum(m.monto for m in movs if m.tipo == 'INYECCION' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA')
+        retiros_transf = sum(m.monto for m in movs if m.tipo == 'RETIRO' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA')
+
+        total_inyecciones = inyecciones_efectivo + inyecciones_transf
+        total_retiros = retiros_efectivo + retiros_transf
+
+        # 5. Compras realizadas por este socio
+        compras_socio = Compra.query.filter_by(propietario_id=prop.id).all() if 'Compra' in globals() else []
+        compras_efectivo = sum(c.total_compra for c in compras_socio if c.metodo_pago == 'EFECTIVO' or not c.metodo_pago)
+        compras_transf = sum(c.total_compra for c in compras_socio if c.metodo_pago == 'TRANSFERENCIA')
+
+        # 6. Cierres de Venta y Transferencias acumuladas
         efectivo_acumulado = 0.0
-        transferencias_acumuladas = 0.0
-
-        # Evaluar si el propietario actual es Cristian (para asignarle todas las transferencias)
+        transferencias_cierres = 0.0
         es_cristian = 'CRISTIAN' in prop.nombre.upper()
 
         if 'CierreDia' in globals():
@@ -316,15 +360,15 @@ def vista_balance():
                         prod = Producto.query.get(d.producto_id)
                         if prod and prod.propietario_id == prop.id:
                             efectivo_acumulado += (d.subtotal or 0.0)
-                
-                # Asignar el 100% de las transferencias únicamente a Cristian
+
                 if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
-                    transferencias_acumuladas += (c.total_transferencias or 0.0)
+                    transferencias_cierres += (c.total_transferencias or 0.0)
 
-        # Efectivo Líquido final = Cierres + Inyecciones - Retiros - Préstamos
-        efectivo_liquido = max(0.0, efectivo_acumulado + total_inyecciones - total_retiros - total_prestamos)
+        # Totales líquidos desglosados
+        efectivo_liquido = max(0.0, efectivo_acumulado + inyecciones_efectivo - retiros_efectivo - prestamos_efectivo - compras_efectivo)
+        transferencias_acumuladas = max(0.0, transferencias_cierres + inyecciones_transf - retiros_transf - prestamos_transf - compras_transf)
 
-        # Patrimonio Neto Total
+        # Patrimonio Neto Total (incluye Deudas por Cobrar)
         patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + deudas_cobrar + total_prestamos
 
         balance_propietarios.append({
@@ -339,7 +383,6 @@ def vista_balance():
             'patrimonio_total': patrimonio_total
         })
 
-    # Histórico de Snapshots y préstamos activos
     snapshots = SnapshotBalanceDiario.query.order_by(SnapshotBalanceDiario.fecha.desc()).limit(30).all()
     prestamos_activos = PrestamoTercero.query.filter_by(estado='PENDIENTE').all()
 
@@ -352,6 +395,114 @@ def vista_balance():
     )
 
 
+@app.route('/admin/balance/guardar-snapshot', methods=['POST'])
+def guardar_snapshot_diario():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
+
+    try:
+        hoy = date.today()
+        propietarios = Propietario.query.all()
+
+        for prop in propietarios:
+            SnapshotBalanceDiario.query.filter_by(fecha=hoy, propietario_nombre=prop.nombre).delete()
+
+            productos_prop = Producto.query.filter_by(propietario_id=prop.id).all()
+            inventario_costo = sum((obtener_stock_total(p) * (p.precio_costo or 0.0)) for p in productos_prop)
+
+            # 2. Deudas por Cobrar (Consulta SQL directa a deudas_cierre)
+            deudas_cobrar = 0.0
+            try:
+                filas_deudas = db.session.execute(
+                    db.text("SELECT * FROM deudas_cierre WHERE LOWER(COALESCE(estado, '')) = 'pendiente' OR cierre_pago_id IS NULL")
+                ).mappings().all()
+
+                for row in filas_deudas:
+                    estado_str = str(row.get('estado', '')).lower()
+                    if estado_str == 'pagado' or row.get('cierre_pago_id') is not None:
+                        continue
+
+                    monto_d = float(row.get('subtotal') or 0.0)
+                    if monto_d <= 0:
+                        continue
+
+                    prod_id = row.get('producto_id')
+                    prod_nom = str(row.get('producto_nombre') or '').strip()
+
+                    prod = None
+                    if prod_id and prod_id > 0:
+                        prod = Producto.query.get(prod_id)
+                    elif prod_nom:
+                        prod = Producto.query.filter(Producto.nombre.ilike(prod_nom)).first()
+
+                    if prod and prod.propietario_id == prop.id:
+                        deudas_cobrar += monto_d
+                    elif not prod and 'CRISTIAN' in prop.nombre.upper():
+                        deudas_cobrar += monto_d
+            except Exception:
+                deudas_cobrar = 0.0
+
+            prestamos = PrestamoTercero.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
+            prestamos_efectivo = sum(p.saldo_pendiente for p in prestamos if not getattr(p, 'metodo_pago', None) or p.metodo_pago == 'EFECTIVO')
+            prestamos_transf = sum(p.saldo_pendiente for p in prestamos if getattr(p, 'metodo_pago', None) == 'TRANSFERENCIA')
+            total_prestamos = prestamos_efectivo + prestamos_transf
+
+            movs = MovimientoCapital.query.filter_by(propietario_id=prop.id).all()
+
+            inyecciones_efectivo = sum(m.monto for m in movs if m.tipo == 'INYECCION' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO'))
+            retiros_efectivo = sum(m.monto for m in movs if m.tipo == 'RETIRO' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO'))
+
+            inyecciones_transf = sum(m.monto for m in movs if m.tipo == 'INYECCION' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA')
+            retiros_transf = sum(m.monto for m in movs if m.tipo == 'RETIRO' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA')
+
+            total_inyecciones = inyecciones_efectivo + inyecciones_transf
+            total_retiros = retiros_efectivo + retiros_transf
+
+            compras_socio = Compra.query.filter_by(propietario_id=prop.id).all() if 'Compra' in globals() else []
+            compras_efectivo = sum(c.total_compra for c in compras_socio if c.metodo_pago == 'EFECTIVO' or not c.metodo_pago)
+            compras_transf = sum(c.total_compra for c in compras_socio if c.metodo_pago == 'TRANSFERENCIA')
+
+            efectivo_acumulado = 0.0
+            transferencias_cierres = 0.0
+            es_cristian = 'CRISTIAN' in prop.nombre.upper()
+
+            if 'CierreDia' in globals():
+                cierres = CierreDia.query.all()
+                for c in cierres:
+                    if hasattr(c, 'detalles'):
+                        for d in c.detalles:
+                            prod = Producto.query.get(d.producto_id)
+                            if prod and prod.propietario_id == prop.id:
+                                efectivo_acumulado += (d.subtotal or 0.0)
+
+                    if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
+                        transferencias_cierres += (c.total_transferencias or 0.0)
+
+            efectivo_liquido = max(0.0, efectivo_acumulado + inyecciones_efectivo - retiros_efectivo - prestamos_efectivo - compras_efectivo)
+            transferencias_acumuladas = max(0.0, transferencias_cierres + inyecciones_transf - retiros_transf - prestamos_transf - compras_transf)
+
+            patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + deudas_cobrar + total_prestamos
+
+            snap = SnapshotBalanceDiario(
+                fecha=hoy,
+                propietario_nombre=prop.nombre,
+                efectivo=efectivo_liquido,
+                transferencia=transferencias_acumuladas,
+                inventario_costo=inventario_costo,
+                deudas_por_cobrar=deudas_cobrar,
+                prestamos_otorgados=total_prestamos,
+                inyecciones=total_inyecciones,
+                retiros=total_retiros,
+                patrimonio_total=patrimonio_total
+            )
+            db.session.add(snap)
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Snapshot congelado en el historial.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+        
 @app.route('/admin/balance/movimiento', methods=['POST'])
 def registrar_movimiento_capital():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -386,69 +537,12 @@ def registrar_prestamo():
             deudor_nombre=data['deudor_nombre'],
             monto=float(data['monto']),
             saldo_pendiente=float(data['monto']),
+            metodo_pago=data.get('metodo_pago', 'EFECTIVO'),
             concepto=data.get('concepto', '')
         )
         db.session.add(nuevo_prestamo)
         db.session.commit()
         return jsonify({'success': True, 'message': 'Préstamo registrado correctamente'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'success': False, 'message': str(e)}), 500
-
-
-@app.route('/admin/balance/guardar-snapshot', methods=['POST'])
-def guardar_snapshot_diario():
-    if 'user' not in session or session.get('rol') != 'admin':
-        return jsonify({'success': False, 'message': 'No autorizado'}), 403
-
-    try:
-        hoy = date.today()
-        propietarios = Propietario.query.all()
-
-        for prop in propietarios:
-            SnapshotBalanceDiario.query.filter_by(fecha=hoy, propietario_nombre=prop.nombre).delete()
-
-            productos_prop = Producto.query.filter_by(propietario_id=prop.id).all()
-            inventario_costo = sum((obtener_stock_total(p) * (p.precio_costo or 0.0)) for p in productos_prop)
-
-            prestamos = PrestamoTercero.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
-            total_prestamos = sum(p.saldo_pendiente for p in prestamos)
-
-            movs = MovimientoCapital.query.filter_by(propietario_id=prop.id).all()
-            total_inyecciones = sum(m.monto for m in movs if m.tipo == 'INYECCION')
-            total_retiros = sum(m.monto for m in movs if m.tipo == 'RETIRO')
-
-            efectivo_acumulado = 0.0
-            transferencias_acumuladas = 0.0
-            es_cristian = 'CRISTIAN' in prop.nombre.upper()
-
-            if 'CierreDia' in globals():
-                cierres = CierreDia.query.all()
-                for c in cierres:
-                    if hasattr(c, 'detalles'):
-                        for d in c.detalles:
-                            prod = Producto.query.get(d.producto_id)
-                            if prod and prod.propietario_id == prop.id:
-                                efectivo_acumulado += (d.subtotal or 0.0)
-                    if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
-                        transferencias_acumuladas += (c.total_transferencias or 0.0)
-
-            efectivo_liquido = max(0.0, efectivo_acumulado + total_inyecciones - total_retiros - total_prestamos)
-            patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + total_prestamos
-
-            snap = SnapshotBalanceDiario(
-                fecha=hoy,
-                propietario_nombre=prop.nombre,
-                inventario_costo=inventario_costo,
-                prestamos_otorgados=total_prestamos,
-                inyecciones=total_inyecciones,
-                retiros=total_retiros,
-                patrimonio_total=patrimonio_total
-            )
-            db.session.add(snap)
-
-        db.session.commit()
-        return jsonify({'success': True, 'message': 'Snapshot congelado en el historial.'})
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'message': str(e)}), 500
