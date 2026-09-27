@@ -1,9 +1,11 @@
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, session, redirect, url_for,jsonify
 
 compras_bp = Blueprint('compras', __name__, template_folder='templates')
 
 @compras_bp.route('/compras', methods=['GET'])
 def vista_compras():
+    if 'user' not in session or session.get('rol') != 'admin':
+            return redirect(url_for('login'))
     from app import db, Proveedor, app
     with app.app_context():
         proveedores = Proveedor.query.all()

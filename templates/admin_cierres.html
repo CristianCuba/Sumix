@@ -23,6 +23,7 @@
                             <th class="p-4">Fecha y Hora</th>
                             <th class="p-4">Responsable</th>
                             <th class="p-4">Total Esperado</th>
+                            <th class="p-4">Transferencias</th>
                             <th class="p-4">Efectivo en Caja</th>
                             <th class="p-4">Diferencia</th>
                             <th class="p-4 text-center">Acciones</th>
@@ -35,6 +36,7 @@
                             <td class="p-4 text-gray-200 font-medium">{{ c.fecha.strftime('%d/%m/%Y %I:%M %p') }}</td>
                             <td class="p-4 text-white font-medium">{{ c.usuario_nombre }}</td>
                             <td class="p-4 text-emerald-400 font-mono font-bold">${{ "%.2f"|format(c.total_esperado) }}</td>
+                            <td class="p-4 text-sky-400 font-mono font-bold">${{ "%.2f"|format(c.total_transferencias or 0.0) }}</td>
                             <td class="p-4 text-white font-mono font-bold">${{ "%.2f"|format(c.efectivo_caja) }}</td>
                             <td class="p-4 font-mono font-bold">
                                 {% if c.diferencia < 0 %}
@@ -54,7 +56,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="p-8 text-center text-gray-500">No hay cierres registrados.</td>
+                            <td colspan="8" class="p-8 text-center text-gray-500">No hay cierres registrados.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -78,11 +80,15 @@
             <button onclick="cerrarModalDetalleCierre()" class="text-gray-400 hover:text-white p-2 text-xl font-bold">&times;</button>
         </div>
 
-        <!-- Indicadores / Totales -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 p-6 bg-[#121316] border-b border-gray-800 text-center">
+        <!-- Indicadores / Totales (4 Columnas) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-[#121316] border-b border-gray-800 text-center">
             <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
                 <span class="text-xs text-gray-400 uppercase tracking-wider block">Total Esperado</span>
                 <span id="modal-total-esperado" class="text-xl font-bold text-emerald-400 font-mono">$0.00</span>
+            </div>
+            <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
+                <span class="text-xs text-gray-400 uppercase tracking-wider block">Transferencias</span>
+                <span id="modal-total-transferencias" class="text-xl font-bold text-sky-400 font-mono">$0.00</span>
             </div>
             <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
                 <span class="text-xs text-gray-400 uppercase tracking-wider block">Efectivo en Caja</span>
@@ -93,9 +99,9 @@
                 <span id="modal-diferencia" class="text-xl font-bold font-mono">$0.00</span>
             </div>
         </div>
+
         <div class="px-6 py-4 bg-[#16171a] border-b border-gray-800">
-            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Desglose por Propietario (Venta Bruta
-                y Ganancia)</h4>
+            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Desglose por Propietario (Venta Bruta y Ganancia)</h4>
             <div id="modal-ganancias-propietarios" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <!-- Se llenará dinámicamente con JavaScript -->
             </div>

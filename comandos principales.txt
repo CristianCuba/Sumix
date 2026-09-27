@@ -11,7 +11,7 @@ git add .
 2. Guardar el estado local con un mensaje claro
 Bash
 
-git commit -m "reportes de cierres arreglados y cierre actualizado para que descuente salario y 3%"
+git commit -m "transferencias actualizadas y arte de deudas"
 
 3. Subir las actualizaciones a GitHub
 Bash
@@ -35,20 +35,6 @@ En caso de que se presente alguna eventualidad:
     git status
 
 
+activar venv
 
-class Usuario(db.Model):
-    __tablename__ = 'usuario'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False)
-    
-    # AQUÍ ESTÁ EL TRUCO: Mantenemos el atributo como 'usuario' para tu código, 
-    # pero le decimos que en la base de datos física busque la columna 'username'
-    usuario = db.Column('username', db.String(50), unique=True, nullable=False)
-    
-    password = db.Column(db.String(200), nullable=False)
-    es_admin = db.Column(db.Boolean, default=False)
-    
-    # Y tu nueva relación de almacenes que acabamos de agregar:
-    almacen_id = db.Column(db.Integer, db.ForeignKey('almacenes.id'), nullable=True)
-    almacen = db.relationship('Almacen', backref='usuarios')
+venv\Scripts\activate

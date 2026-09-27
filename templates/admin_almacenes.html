@@ -19,8 +19,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         {% for category, message in messages %}
-        <div
-            class="p-4 mb-4 text-sm rounded-xl {% if category == 'danger' %}bg-red-900 text-white{% else %}bg-emerald-900 text-white{% endif %}">
+        <div class="p-4 mb-4 text-sm rounded-xl {% if category == 'danger' %}bg-red-900 text-white{% else %}bg-emerald-900 text-white{% endif %}">
             {{ message }}
         </div>
         {% endfor %}
@@ -82,7 +81,6 @@
 
     <!-- 3. Filtros y Búsqueda -->
     <div class="flex flex-col md:flex-row gap-4 items-center justify-between pt-2">
-        <!-- Filtro Dinámico por Propietario -->
         <div class="flex flex-wrap gap-2 w-full md:w-auto">
             <a href="?propietario_id=todos"
                 class="px-4 py-2 rounded-xl text-sm font-semibold transition-all {% if propietario_filtro_id == 'todos' %}bg-orange-500 text-white shadow-lg shadow-orange-500/20{% else %}bg-[#1a1b1e] text-gray-400 border border-gray-800 hover:bg-gray-800{% endif %}">
@@ -97,7 +95,6 @@
             {% endfor %}
         </div>
 
-        <!-- Barra de Búsqueda -->
         <div class="relative w-full md:w-80">
             <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,389 +109,346 @@
 </header>
 
 <script>
-    cargarMapaStock('{{ mapa_stock_json | tojson | safe if mapa_stock_json else "{}" }}');
+    const mapaStockData = {{ mapa_stock_json | tojson | safe if mapa_stock_json else "{}" }};
+    cargarMapaStock(mapaStockData);
+    const listaConceptos = {{ conceptos_json | tojson | safe if conceptos_json else "[]" }};
 </script>
-<script>
-    const listaConceptos = {{ conceptos_json | tojson | safe }};
-</script>
 
-    <!-- Tabla Detallada de Inventario -->
-    <section class="p-6 flex-1">
-        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
-                    <thead>
-                        <tr class="bg-[#121316] text-gray-400 uppercase text-xs">
-                            <th class="p-4">Producto</th>
-                            <th class="p-4">Proveedor</th>
-                            <th class="p-4 text-center">Unidad</th>
-                            <th class="p-4">Ubicación / Stock</th>
-                            <th class="p-4 text-right">P. Costo</th>
-                            <th class="p-4 text-right">P. Venta</th>
-                            <th class="p-4 text-center">Vencimiento</th>
-                            <th class="p-4 text-center">Stock Total</th>
-                            <th class="p-4 text-center">Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-800">
-                        {% for producto in productos %}
-                        <tr class="hover:bg-gray-800/30 text-gray-300">
-                            <!-- Producto -->
-                            <td class="p-4 font-semibold text-white">
-                                {{ producto.nombre }}
-                                {% if producto.codigo %}
-                                    <span class="block text-xs font-normal text-gray-500 font-mono">{{ producto.codigo }}</span>
-                                {% endif %}
-                            </td>
-                
-                            <!-- Proveedor (Relación producto.proveedor) -->
-                            <td class="p-4 text-gray-400">
-                                {% if producto.proveedor %}
-                                    <span class="inline-flex items-center gap-1.5 bg-gray-800 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-300 border border-gray-700">
-                                        {{ producto.proveedor.nombre }}
-                                    </span>
-                                {% else %}
-                                    <span class="text-xs text-gray-600 italic">Sin proveedor</span>
-                                {% endif %}
-                            </td>
-                
-                            <!-- Unidad de Medida -->
-                            <td class="p-4 text-center text-xs text-gray-400">{{ producto.unidad_medida }}</td>
-                
-                            <!-- Desglose por Almacén / Ubicación -->
-                            <td class="p-4">
-                                <div class="flex flex-col gap-1">
-                                    {% for stock in producto.stocks %}
-                                        {% if stock.cantidad > 0 %}
-                                            <div class="text-xs flex items-center gap-1.5">
-                                                <span class="font-medium text-gray-300">{{ stock.almacen.nombre }}</span>
-                                                {% if stock.almacen.ubicacion %}
-                                                    <span class="text-[10px] text-gray-500">({{ stock.almacen.ubicacion }})</span>
-                                                {% endif %}
-                                                <span class="font-mono text-gray-400 font-bold ml-auto">: {{ stock.cantidad }}</span>
-                                            </div>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-xs text-gray-600 italic">Sin stock asignado</span>
-                                    {% endfor %}
-                                </div>
-                            </td>
-                
-                            <!-- Precio de Costo -->
-                            <td class="p-4 text-right font-mono text-gray-400">
-                                ${{ "%.2f"|format(producto.precio_costo) }}
-                            </td>
-                
-                            <!-- Precio de Venta -->
-                            <td class="p-4 text-right font-mono font-bold text-emerald-400">
-                                ${{ "%.2f"|format(producto.precio_venta) }}
-                            </td>
-                
-                            <!-- Fecha de Vencimiento -->
-                            <!-- Fecha de Vencimiento con Alertas Visuales -->
-                            <!-- Fecha de Vencimiento con Alertas Visuales -->
-                            <td class="p-4 text-center font-mono text-xs">
-                                {% if producto.fecha_vencimiento %}
-                                    {% set dias_restantes = (producto.fecha_vencimiento - hoy).days %}
-                                    
-                                    {% if dias_restantes < 0 %}
-                                        <!-- VENCIDO (Rojo) -->
-                                        <span class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 font-semibold inline-flex items-center gap-1" title="Producto Vencido">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                            {{ producto.fecha_vencimiento.strftime('%d/%m/%Y') }}
-                                        </span>
+<!-- Tabla Detallada de Inventario -->
+<section class="p-6 flex-1">
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse text-sm">
+                <thead>
+                    <tr class="bg-[#121316] text-gray-400 uppercase text-xs">
+                        <th class="p-4">Producto</th>
+                        <th class="p-4">Proveedor</th>
+                        <th class="p-4 text-center">Unidad</th>
+                        <th class="p-4">Ubicación / Stock</th>
+                        <th class="p-4 text-right">P. Costo</th>
+                        <th class="p-4 text-right">P. Venta</th>
+                        <th class="p-4 text-center">Vencimiento</th>
+                        <th class="p-4 text-center">Stock Total</th>
+                        <th class="p-4 text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-800">
+                    {% for producto in productos %}
+                    <tr class="hover:bg-gray-800/30 text-gray-300">
+                        <td class="p-4 font-semibold text-white">
+                            {{ producto.nombre }}
+                            {% if producto.codigo %}
+                                <span class="block text-xs font-normal text-gray-500 font-mono">{{ producto.codigo }}</span>
+                            {% endif %}
+                        </td>
 
-                                    {% elif dias_restantes <= 7 %}
-                                        <!-- PRÓXIMO A VENCER (Amarillo / Alerta) -->
-                                        <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold inline-flex items-center gap-1" title="Vence en {{ dias_restantes }} días">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                                            {{ producto.fecha_vencimiento.strftime('%d/%m/%Y') }}
-                                        </span>
+                        <td class="p-4 text-gray-400">
+                            {% if producto.proveedor %}
+                                <span class="inline-flex items-center gap-1.5 bg-gray-800 px-2.5 py-1 rounded-lg text-xs font-medium text-gray-300 border border-gray-700">
+                                    {{ producto.proveedor.nombre }}
+                                </span>
+                            {% else %}
+                                <span class="text-xs text-gray-600 italic">Sin proveedor</span>
+                            {% endif %}
+                        </td>
 
-                                    {% else %}
-                                        <!-- VIGENTE (Gris / Normal) -->
-                                        <span class="px-2 py-1 rounded-lg bg-gray-800/80 text-gray-300 border border-gray-700 inline-block">
-                                            {{ producto.fecha_vencimiento.strftime('%d/%m/%Y') }}
-                                        </span>
+                        <td class="p-4 text-center text-xs text-gray-400">{{ producto.unidad_medida }}</td>
+
+                        <td class="p-4">
+                            <div class="flex flex-col gap-1">
+                                {% for stock in producto.stocks %}
+                                    {% if stock.cantidad > 0 %}
+                                        <div class="text-xs flex items-center gap-1.5">
+                                            <span class="font-medium text-gray-300">{{ stock.almacen.nombre }}</span>
+                                            {% if stock.almacen.ubicacion %}
+                                                <span class="text-[10px] text-gray-500">({{ stock.almacen.ubicacion }})</span>
+                                            {% endif %}
+                                            <span class="font-mono text-gray-400 font-bold ml-auto">: {{ stock.cantidad }}</span>
+                                        </div>
                                     {% endif %}
                                 {% else %}
-                                    <span class="text-xs text-gray-600 italic">N/A</span>
+                                    <span class="text-xs text-gray-600 italic">Sin stock asignado</span>
+                                {% endfor %}
+                            </div>
+                        </td>
+
+                        <td class="p-4 text-right font-mono text-gray-400">
+                            ${{ "%.2f"|format(producto.precio_costo) }}
+                        </td>
+
+                        <td class="p-4 text-right font-mono font-bold text-emerald-400">
+                            ${{ "%.2f"|format(producto.precio_venta) }}
+                        </td>
+
+                        <td class="p-4 text-center font-mono text-xs">
+                            {% if producto.fecha_vencimiento %}
+                                {% set dias_restantes = (producto.fecha_vencimiento - hoy).days %}
+                                {% if dias_restantes < 0 %}
+                                    <span class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 font-semibold inline-flex items-center gap-1" title="Producto Vencido">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                        {{ producto.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                    </span>
+                                {% elif dias_restantes <= 7 %}
+                                    <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 font-semibold inline-flex items-center gap-1" title="Vence en {{ dias_restantes }} días">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                        {{ producto.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                    </span>
+                                {% else %}
+                                    <span class="px-2 py-1 rounded-lg bg-gray-800/80 text-gray-300 border border-gray-700 inline-block">
+                                        {{ producto.fecha_vencimiento.strftime('%d/%m/%Y') }}
+                                    </span>
                                 {% endif %}
-                            </td>
-                
-                            <!-- Stock Total (Property @property cantidad_total) -->
-                            <td class="p-4 text-center font-mono font-bold text-amber-400">
-                                {{ producto.cantidad_total }}
-                            </td>
-                            <!-- Botón Editar -->
-                            <!-- Botón Editar -->
-                            <!-- Botón Editar -->
-                            <!-- Botón Editar -->
-                           
-                            <!-- Acciones -->
-                            <td class="p-4 text-center">
-                                <div class="flex items-center justify-center gap-2">
-                                    <!-- Botón Mover -->
-                                    <button type="button" onclick='abrirModalTraslado({{ producto.id }}, "{{ producto.nombre }}")' title="Trasladar Stock"
-                                        class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
+                            {% else %}
+                                <span class="text-xs text-gray-600 italic">N/A</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="p-4 text-center font-mono font-bold text-amber-400">
+                            {{ producto.cantidad_total }}
+                        </td>
+
+                        <td class="p-4 text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <button type="button" onclick='abrirModalTraslado({{ producto.id }}, "{{ producto.nombre }}")' title="Trasladar Stock"
+                                    class="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                                    </svg>
+                                    Mover
+                                </button>
+                                <button type="button" onclick="abrirModalEditarProducto(this)" data-id="{{ producto.id }}"
+                                    data-nombre="{{ producto.nombre }}" data-unidad="{{ producto.unidad_medida or 'u' }}"
+                                    data-costo="{{ producto.precio_costo }}" data-venta="{{ producto.precio_venta }}"
+                                    data-proveedor="{{ producto.proveedor_id or '' }}"
+                                    data-propietario="{{ producto.propietario_id or '' }}"
+                                    data-vencimiento="{% if producto.fecha_vencimiento %}{{ producto.fecha_vencimiento.strftime('%Y-%m-%d') }}{% endif %}"
+                                    title="Editar Producto"
+                                    class="px-2.5 py-1.5 bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 012.828 0L20.5 5.5a2 2 0 010 2.828l-8.5 8.5H9v-3.5l8.5-8.5z"></path>
+                                    </svg>
+                                    Editar
+                                </button>
+                                <form action="{{ url_for('eliminar_producto', id=producto.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este producto? Esta acción borrará también su stock en todos los almacenes.');" class="inline">
+                                    <button type="submit" title="Eliminar Producto"
+                                        class="px-2.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
-                                        Mover
+                                        Borrar
                                     </button>
-                                    <button type="button" onclick="abrirModalEditarProducto(this)" data-id="{{ producto.id }}"
-                                        data-nombre="{{ producto.nombre }}" data-unidad="{{ producto.unidad_medida or 'u' }}"
-                                        data-costo="{{ producto.precio_costo }}" data-venta="{{ producto.precio_venta }}"
-                                        data-proveedor="{{ producto.proveedor_id or '' }}"
-                                        data-vencimiento="{% if producto.fecha_vencimiento %}{{ producto.fecha_vencimiento.strftime('%Y-%m-%d') }}{% endif %}"
-                                        title="Editar Producto"
-                                        class="px-2.5 py-1.5 bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white border border-amber-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 012.828 0L20.5 5.5a2 2 0 010 2.828l-8.5 8.5H9v-3.5l8.5-8.5z">
-                                            </path>
-                                        </svg>
-                                        Editar
-                                    </button>
-                                    <!-- Botón Eliminar -->
-                                    <form action="{{ url_for('eliminar_producto', id=producto.id) }}" method="POST" onsubmit="return confirm('¿Estás seguro de que deseas eliminar este producto? Esta acción borrará también su stock en todos los almacenes.');" class="inline">
-                                        <button type="submit" 
-                                            title="Eliminar Producto"
-                                            class="px-2.5 py-1.5 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 rounded-xl text-xs font-semibold transition-all inline-flex items-center gap-1">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                                            </svg>
-                                            Borrar
-                                        </button>
-                                    </form>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-    </section>
-    
- 
-    <!-- Modal: Editar Producto -->
-    <div id="modal-editar-producto"
-        class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
-                <h3 class="text-lg font-bold text-white">Editar Producto</h3>
-                <button onclick="cerrarModalEditarProducto()"
-                    class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+    </div>
+</section>
+
+<!-- Modal: Editar Producto -->
+<div id="modal-editar-producto"
+    class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+            <h3 class="text-lg font-bold text-white">Editar Producto</h3>
+            <button onclick="cerrarModalEditarProducto()"
+                class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form id="form-editar-producto" method="POST" action="" class="space-y-4 text-sm">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del Producto</label>
+                <input type="text" id="edit_nombre" name="nombre" required
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
             </div>
-    
-            <form id="form-editar-producto" method="POST" action="" class="space-y-4 text-sm">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del
-                        Producto</label>
-                    <input type="text" id="edit_nombre" name="nombre" required
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad</label>
+                    <select id="edit_unidad_medida" name="unidad_medida" required
                         class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="u">Unidad (u)</option>
+                        <option value="lb">Libras (lb)</option>
+                        <option value="kg">Kilogramos (kg)</option>
+                        <option value="caja">Caja</option>
+                        <option value="paquete">Paquete</option>
+                        <option value="L">Litro (L)</option>
+                    </select>
                 </div>
-    
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad de Medida</label>
-                        <select id="edit_unidad_medida" name="unidad_medida" required
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                            <option value="u">Unidad (u)</option>
-                            <option value="lb">Libras (lb)</option>
-                            <option value="kg">Kilogramos (kg)</option>
-                            <option value="caja">Caja</option>
-                            <option value="paquete">Paquete</option>
-                            <option value="L">Litro (L)</option>
-                        </select>
-                    </div>
-                    <!-- Fila de Proveedor y Propietario -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <!-- Selector de Proveedor -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Proveedor</label>
-                            <select name="proveedor_id"
-                                class="w-[#1a1b1e] w-full bg-[#111214] border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm">
-                                <option value="">Seleccione un proveedor</option>
-                                {% for prov in proveedores %}
-                                <option value="{{ prov.id }}">{{ prov.nombre }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    
-                        <!-- NUEVO: Selector de Propietario -->
-                        <div>
-                            <label class="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Propietario</label>
-                            <select name="propietario_id"
-                                class="w-full bg-[#111214] border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-orange-500 text-sm">
-                                <option value="">Sin propietario (Propio)</option>
-                                {% for prop in propietarios %}
-                                <option value="{{ prop.id }}">{{ prop.nombre }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Proveedor</label>
+                    <select id="edit_proveedor_id" name="proveedor_id"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm">
+                        <option value="">Seleccione proveedor</option>
+                        {% for prov in proveedores %}
+                        <option value="{{ prov.id }}">{{ prov.nombre }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-    
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Costo Unitario</label>
-                        <input type="number" step="0.01" id="edit_precio_costo" name="precio_costo" required
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Venta Unitario</label>
-                        <input type="number" step="0.01" id="edit_precio_venta" name="precio_venta" required
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                    </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Propietario</label>
+                    <select id="edit_propietario_id" name="propietario_id"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:outline-none focus:border-orange-500 text-sm">
+                        <option value="">Sin propietario (Propio)</option>
+                        {% for prop in propietarios %}
+                        <option value="{{ prop.id }}">{{ prop.nombre }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-    
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Costo Unitario</label>
+                    <input type="number" step="0.01" id="edit_precio_costo" name="precio_costo" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Venta Unitario</label>
+                    <input type="number" step="0.01" id="edit_precio_venta" name="precio_venta" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">
+                    Vencimiento <span class="text-gray-500 font-normal lowercase">(opcional)</span>
+                </label>
+                <input type="date" id="edit_fecha_vencimiento" name="fecha_vencimiento"
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none [color-scheme:dark]">
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                <button type="button" onclick="cerrarModalEditarProducto()"
+                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
+                <button type="submit"
+                    class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Actualizar Producto</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Crear Nuevo Producto -->
+<div id="modal-producto" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+            <h3 class="text-lg font-bold text-white">Registrar Nuevo Producto</h3>
+            <button onclick="cerrarModalProducto()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form method="POST" action="{{ url_for('guardar_producto') }}" class="space-y-4 text-sm">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del Producto</label>
+                <input type="text" name="nombre" required placeholder="Ej: Malta Bucanero"
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Almacén Inicial</label>
+                <select name="almacen_id" id="prod_almacen" required
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                    <option value="" disabled selected>Seleccione un Almacén</option>
+                    {% for almacen in almacenes %}
+                    <option value="{{ almacen.id }}">{{ almacen.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad Inicial</label>
+                    <input type="number" step="0.01" name="cantidad" required placeholder="0.00"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad de Medida</label>
+                    <select name="unidad_medida" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="u" selected>Unidad (u)</option>
+                        <option value="lb">Libras (lb)</option>
+                        <option value="kg">Kilogramos (kg)</option>
+                        <option value="caja">Caja</option>
+                        <option value="paquete">Paquete</option>
+                        <option value="L">Litro (L)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Costo Unitario</label>
+                    <input type="number" step="0.01" id="precio_costo" name="precio_costo" required placeholder="0.00"
+                        oninput="calcularSugerenciaVenta()"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Venta Unitario</label>
+                    <input type="number" step="0.01" id="precio_venta" name="precio_venta" required placeholder="0.00"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
+                    <small id="sugerencia_texto" class="text-xs text-emerald-400 mt-1 block h-4 font-mono"></small>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Proveedor</label>
+                    <select name="proveedor_id" id="prod_proveedor"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="" selected>Seleccione un proveedor</option>
+                        {% for proveedor in proveedores %}
+                        <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Propietario</label>
+                    <select name="propietario_id" id="prod_propietario"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                        <option value="" selected>Sin Propietario (Propio)</option>
+                        {% for propietario in propietarios %}
+                        <option value="{{ propietario.id }}">{{ propietario.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
                 <div>
                     <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">
                         Vencimiento <span class="text-gray-500 font-normal lowercase">(opcional)</span>
                     </label>
-                    <input type="date" id="edit_fecha_vencimiento" name="fecha_vencimiento"
+                    <input type="date" name="fecha_vencimiento"
                         class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none [color-scheme:dark]">
                 </div>
-    
-                <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
-                    <button type="button" onclick="cerrarModalEditarProducto()"
-                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
-                    <button type="submit"
-                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Actualizar
-                        Producto</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    <!-- Modal: Crear Nuevo Producto -->
-    <div id="modal-producto" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
-            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
-                <h3 class="text-lg font-bold text-white">Registrar Nuevo Producto</h3>
-                <button onclick="cerrarModalProducto()"
-                    class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
-            </div>
-    
-            <form method="POST" action="{{ url_for('guardar_producto') }}" class="space-y-4 text-sm">
-                <!-- Nombre -->
+
                 <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre / Descripción del
-                        Producto</label>
-                    <input type="text" name="nombre" required placeholder="Ej: Malta Bucanero"
-                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none">
-                </div>
-    
-                <!-- Almacén Inicial -->
-                <div>
-                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Almacén Inicial</label>
-                    <select name="almacen_id" id="prod_almacen" required
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Estado del Pago</label>
+                    <select name="estado_pago" required
                         class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                        <option value="" disabled selected>Seleccione un Almacén</option>
-                        {% for almacen in almacenes %}
-                        <option value="{{ almacen.id }}">{{ almacen.nombre }}</option>
-                        {% endfor %}
+                        <option value="Pagado">Pagado al contado</option>
+                        <option value="Pendiente">Pendiente (A Crédito / Cuentas por Pagar)</option>
                     </select>
                 </div>
-    
-                <!-- Cantidad, Unidad, Costo, Venta -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad Inicial</label>
-                        <input type="number" step="0.01" name="cantidad" required placeholder="0.00"
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Unidad de Medida</label>
-                        <select name="unidad_medida" required
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                            <option value="u" selected>Unidad (u)</option>
-                            <option value="lb">Libras (lb)</option>
-                            <option value="kg">Kilogramos (kg)</option>
-                            <option value="caja">Caja</option>
-                            <option value="paquete">Paquete</option>
-                            <option value="L">Litro (L)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Costo Unitario</label>
-                        <input type="number" step="0.01" id="precio_costo" name="precio_costo" required placeholder="0.00"
-                            oninput="calcularSugerenciaVenta()"
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">P. Venta Unitario</label>
-                        <input type="number" step="0.01" id="precio_venta" name="precio_venta" required placeholder="0.00"
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none">
-                        <small id="sugerencia_texto" class="text-xs text-emerald-400 mt-1 block h-4 font-mono"></small>
-                    </div>
-                </div>
-    
-                <!-- PROVEEDOR Y PROPIETARIO (NUEVO) -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Proveedor</label>
-                        <select name="proveedor_id" id="prod_proveedor"
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                            <option value="" selected>Seleccione un proveedor</option>
-                            {% for proveedor in proveedores %}
-                            <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-    
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Propietario</label>
-                        <select name="propietario_id" id="prod_propietario"
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                            <option value="" selected>Sin Propietario (Propio)</option>
-                            {% for propietario in propietarios %}
-                            <option value="{{ propietario.id }}">{{ propietario.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-    
-                <!-- VENCIMIENTO Y ESTADO DEL PAGO -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">
-                            Vencimiento <span class="text-gray-500 font-normal lowercase">(opcional)</span>
-                        </label>
-                        <input type="date" name="fecha_vencimiento"
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white font-mono focus:border-orange-500 focus:outline-none [color-scheme:dark]">
-                    </div>
-    
-                    <div>
-                        <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Estado del Pago</label>
-                        <select name="estado_pago" required
-                            class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                            <option value="Pagado">Pagado al contado</option>
-                            <option value="Pendiente">Pendiente (A Crédito / Cuentas por Pagar)</option>
-                        </select>
-                    </div>
-                </div>
-    
-                <!-- Botones de Acción -->
-                <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
-                    <button type="button" onclick="cerrarModalProducto()"
-                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
-                    <button type="submit"
-                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Guardar
-                        Producto</button>
-                </div>
-            </form>
-        </div>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                <button type="button" onclick="cerrarModalProducto()"
+                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm">Cancelar</button>
+                <button type="submit"
+                    class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20">Guardar Producto</button>
+            </div>
+        </form>
     </div>
-    <!-- Modal de Traslado (Oculto por defecto) -->
-<!-- Modal de Traslado (Oculto por defecto) -->
+</div>
+
+<!-- Modal de Traslado -->
 <div id="modalTraslado"
     class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl w-full max-w-md p-6 text-white shadow-2xl relative">
 
-        <!-- Botón para cerrar -->
         <button type="button" onclick="cerrarModalTraslado()"
             class="absolute top-4 right-4 text-gray-400 hover:text-white text-lg font-bold">
             ✕
@@ -506,10 +460,8 @@
         </div>
 
         <form action="{{ url_for('trasladar_stock') }}" method="POST" class="space-y-4">
-            <!-- ID Oculto del Producto -->
             <input type="hidden" name="producto_id" id="modalProductoId">
 
-            <!-- Tipo de Operación -->
             <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Tipo de Operación</label>
                 <select name="tipo_operacion_id" id="modalTipoOperacion" required onchange="cambiarTipoOperacion()"
@@ -523,17 +475,13 @@
                 </select>
             </div>
 
-            <!-- Concepto de Movimiento -->
             <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Concepto</label>
                 <select name="concepto_id" id="modalConcepto" required
                     class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:border-orange-500 focus:outline-none">
-                    <!-- Se llena dinámicamente con JS -->
                 </select>
             </div>
 
-            <!-- Almacén Origen (Contenedor condicional) -->
-            <!-- Contenedor Origen -->
             <div id="contenedorOrigen">
                 <div class="flex justify-between items-center mb-1">
                     <label class="block text-xs font-semibold text-gray-400 uppercase" id="labelOrigenText">Desde (Origen)</label>
@@ -546,11 +494,9 @@
                     {% endfor %}
                 </select>
             </div>
-            
-            <!-- Contenedor Destino -->
+
             <div id="contenedorDestino">
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1" id="labelDestinoText">Hacia
-                    (Destino)</label>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1" id="labelDestinoText">Hacia (Destino)</label>
                 <select name="almacen_destino_id" id="modalAlmacenDestino"
                     class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:border-orange-500 focus:outline-none">
                     {% for alm in almacenes %}
@@ -559,14 +505,12 @@
                 </select>
             </div>
 
-            <!-- Cantidad -->
             <div>
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Cantidad</label>
                 <input type="number" step="0.01" min="0.01" name="cantidad" required placeholder="Ej. 10"
                     class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-sm text-white focus:border-orange-500 focus:outline-none font-mono">
             </div>
 
-            <!-- Acciones -->
             <div class="flex items-center justify-end gap-3 pt-2">
                 <button type="button" onclick="cerrarModalTraslado()"
                     class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all">
@@ -580,7 +524,5 @@
         </form>
     </div>
 </div>
-
-
 
 {% endblock %}

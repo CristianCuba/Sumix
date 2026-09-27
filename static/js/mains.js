@@ -1,5 +1,11 @@
 // ==========================================
-// MODAL DE PRODUCTOS
+// VARIABLES GLOBALES
+// ==========================================
+var mapaStock = {};
+var productoSeleccionadoId = null;
+
+// ==========================================
+// MODAL DE PRODUCTOS (CREACIÓN / EDICIÓN)
 // ==========================================
 function abrirModalProducto() {
     const modal = document.getElementById('modal-producto');
@@ -17,9 +23,6 @@ function cerrarModalProducto() {
     }
 }
 
-// ==========================================
-// MODAL DE EDICIÓN DE PRODUCTOS
-// ==========================================
 function abrirModalEditarProducto(btn) {
     const id = btn.getAttribute('data-id');
     const nombre = btn.getAttribute('data-nombre');
@@ -27,6 +30,7 @@ function abrirModalEditarProducto(btn) {
     const costo = btn.getAttribute('data-costo');
     const venta = btn.getAttribute('data-venta');
     const proveedorId = btn.getAttribute('data-proveedor');
+    const propietarioId = btn.getAttribute('data-propietario');
     const fechaVenc = btn.getAttribute('data-vencimiento');
 
     const modal = document.getElementById('modal-editar-producto');
@@ -40,6 +44,7 @@ function abrirModalEditarProducto(btn) {
         if (document.getElementById('edit_precio_costo')) document.getElementById('edit_precio_costo').value = costo || '0';
         if (document.getElementById('edit_precio_venta')) document.getElementById('edit_precio_venta').value = venta || '0';
         if (document.getElementById('edit_proveedor_id')) document.getElementById('edit_proveedor_id').value = proveedorId || '';
+        if (document.getElementById('edit_propietario_id')) document.getElementById('edit_propietario_id').value = propietarioId || '';
         if (document.getElementById('edit_fecha_vencimiento')) document.getElementById('edit_fecha_vencimiento').value = fechaVenc || '';
 
         modal.classList.remove('hidden');
@@ -57,23 +62,19 @@ function cerrarModalEditarProducto() {
 
 function filtrarTablaProductos() {
     const input = document.getElementById('filtro-productos');
+    if (!input) return;
     const filter = input.value.toLowerCase().trim();
     const filas = document.querySelectorAll('tbody tr');
 
     filas.forEach(fila => {
         const textoFila = fila.textContent.toLowerCase();
-        if (textoFila.includes(filter)) {
-            fila.style.display = '';
-        } else {
-            fila.style.display = 'none';
-        }
+        fila.style.display = textoFila.includes(filter) ? '' : 'none';
     });
 }
 
-// Declaraciones al inicio
-var mapaStock = {};
-var productoSeleccionadoId = null;
-
+// ==========================================
+// MODAL Y MOVIMIENTOS DE TRASLADO DE STOCK
+// ==========================================
 function cargarMapaStock(datosStock) {
     mapaStock = datosStock || {};
 }
@@ -93,30 +94,27 @@ function abrirModalTraslado(id, nombre) {
     if (typeof actualizarConceptos === 'function') actualizarConceptos();
     if (typeof cambiarTipoOperacion === 'function') cambiarTipoOperacion();
 
-    if (selectorOrigen && window.mapaStock && window.mapaStock[productoSeleccionadoId]) {
-        const stockProducto = window.mapaStock[productoSeleccionadoId];
+    if (selectorOrigen && mapaStock && mapaStock[productoSeleccionadoId]) {
+        const stockProducto = mapaStock[productoSeleccionadoId];
         const almacenConStock = Object.keys(stockProducto).find(almId => stockProducto[almId] > 0);
-        
         if (almacenConStock) {
             selectorOrigen.value = almacenConStock;
         }
     }
 
-    if (typeof actualizarStockDisponible === 'function') {
-        actualizarStockDisponible();
-    }
+    actualizarStockDisponible();
 }
 
 function actualizarConceptos() {
     const selectTipo = document.getElementById('modalTipoOperacion');
     const selectConcepto = document.getElementById('modalConcepto');
-    if (!selectTipo || !selectConcepto) return;
+    if (!selectTipo || !selectConcepto || typeof listaConceptos === 'undefined') return;
 
     const tipoIdActual = parseInt(selectTipo.value);
     selectConcepto.innerHTML = '';
 
     const filtrados = listaConceptos.filter(c => c.tipo_id === tipoIdActual);
-    
+
     if (filtrados.length === 0) {
         let opt = document.createElement('option');
         opt.value = "";
@@ -133,9 +131,7 @@ function actualizarConceptos() {
 }
 
 function cambiarTipoOperacion() {
-    if (typeof actualizarConceptos === 'function') {
-        actualizarConceptos(); 
-    }
+    actualizarConceptos();
 
     const selectTipo = document.getElementById('modalTipoOperacion');
     if (!selectTipo) return;
@@ -154,7 +150,7 @@ function cambiarTipoOperacion() {
     if (requiereOrigen) {
         contenedorOrigen.style.display = 'block';
         if (inputOrigen) inputOrigen.required = true;
-        if (typeof actualizarStockDisponible === 'function') actualizarStockDisponible();
+        actualizarStockDisponible();
     } else {
         contenedorOrigen.style.display = 'none';
         if (inputOrigen) inputOrigen.required = false;
@@ -188,18 +184,14 @@ function actualizarStockDisponible() {
     const cantidadDisponible = stockProducto[almacenId] ?? stockProducto[parseInt(almacenId)] ?? 0;
 
     textoStock.textContent = `Disponible: ${cantidadDisponible}`;
-
-    if (cantidadDisponible <= 0) {
-        textoStock.className = "text-xs font-mono font-bold text-rose-500";
-    } else {
-        textoStock.className = "text-xs font-mono font-bold text-emerald-400";
-    }
+    textoStock.className = cantidadDisponible <= 0
+        ? "text-xs font-mono font-bold text-rose-500"
+        : "text-xs font-mono font-bold text-emerald-400";
 }
 
 // ==========================================
-// CONTROL DEL CIERRE DE DÍA Y ARQUEO DE CAJA
+// CONTROL DE CIERRE DE DÍA Y ARQUEO DE CAJA
 // ==========================================
-
 function filtrarProductos() {
     const inputBuscador = document.getElementById('buscador');
     if (!inputBuscador) return;
@@ -234,7 +226,22 @@ function calcular() {
         const stockFinal = inputFinal ? (parseFloat(inputFinal.value) || 0) : 0;
 
         let vendidos = (stockInicial + entradas) - stockFinal;
-        if (vendidos < 0) vendidos = 0;
+
+        const spanVendidos = fila.querySelector('.vendidos');
+        const spanSubtotal = fila.querySelector('.subtotal');
+
+        if (vendidos < 0) {
+            vendidos = 0;
+            if (spanVendidos) {
+                spanVendidos.textContent = "Exceso físico";
+                spanVendidos.className = "p-4 font-bold text-amber-400 font-mono vendidos text-xs";
+            }
+        } else {
+            if (spanVendidos) {
+                spanVendidos.textContent = vendidos;
+                spanVendidos.className = "p-4 font-bold text-white font-mono vendidos";
+            }
+        }
 
         const subtotal = vendidos * precio;
         totalBrutoGeneral += subtotal;
@@ -242,17 +249,15 @@ function calcular() {
         const propId = parseInt(fila.getAttribute('data-propietario-id')) || 0;
         const propNombre = (fila.getAttribute('data-propietario-nombre') || "").toLowerCase();
 
-        if (propId === 1 || propNombre.includes('dayana')) {
-            ventasDayana += subtotal;
-        }
-        if (propId === 2 || propNombre.includes('cristian')) {
-            tieneCristian = true;
+        if (vendidos > 0) {
+            if (propId === 1 || propNombre.includes('dayana')) {
+                ventasDayana += subtotal;
+            }
+            if (propId === 2 || propNombre.includes('cristian')) {
+                tieneCristian = true;
+            }
         }
 
-        const spanVendidos = fila.querySelector('.vendidos');
-        const spanSubtotal = fila.querySelector('.subtotal');
-        
-        if (spanVendidos) spanVendidos.textContent = vendidos;
         if (spanSubtotal) spanSubtotal.textContent = `$${subtotal.toFixed(2)}`;
     });
 
@@ -263,28 +268,22 @@ function calcular() {
     const inputTransferencia = document.getElementById('dinero-transferencia');
     const totalTransferencias = inputTransferencia ? (parseFloat(inputTransferencia.value) || 0) : 0;
 
-    const totalDeudas = listaDeudas.reduce((acc, item) => acc + item.subtotal, 0);
-
-    let totalEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias - totalDeudas;
+    let totalEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias;
 
     const elemTotalEsperado = document.getElementById('total-esperado');
     const elemComisionDayana = document.getElementById('txt-comision-dayana');
+    const elemSalarioCristian = document.getElementById('txt-salario-cristian');
 
     if (elemTotalEsperado) {
-        if (totalEsperado < 0) {
-            elemTotalEsperado.textContent = `-$${Math.abs(totalEsperado).toFixed(2)}`;
-        } else {
-            elemTotalEsperado.textContent = `$${totalEsperado.toFixed(2)}`;
-        }
+        elemTotalEsperado.textContent = totalEsperado < 0
+            ? `-$${Math.abs(totalEsperado).toFixed(2)}`
+            : `$${totalEsperado.toFixed(2)}`;
     }
 
-    if (elemComisionDayana) {
-        elemComisionDayana.textContent = `$${comisionDayana.toFixed(2)}`;
-    }
+    if (elemComisionDayana) elemComisionDayana.textContent = `$${comisionDayana.toFixed(2)}`;
+    if (elemSalarioCristian) elemSalarioCristian.textContent = `$${descuentoCristian.toFixed(2)}`;
 
-    if (typeof validarCierreCaja === 'function') {
-        validarCierreCaja(totalEsperado);
-    }
+    validarCierreCaja(totalEsperado);
 }
 
 async function enviarCierre() {
@@ -294,11 +293,14 @@ async function enviarCierre() {
     let productos = [];
 
     filas.forEach(fila => {
+        const spanVendidosText = fila.querySelector('.vendidos').textContent;
+        const vendidosVal = spanVendidosText === "Exceso físico" ? 0 : parseFloat(spanVendidosText) || 0;
+
         productos.push({
             id: fila.getAttribute('data-id'),
             entradas: parseFloat(fila.querySelector('.entradas').value) || 0,
             stock_final: parseFloat(fila.querySelector('.stock-final').value) || 0,
-            vendidos: parseFloat(fila.querySelector('.vendidos').textContent) || 0,
+            vendidos: vendidosVal,
             subtotal: parseFloat(fila.querySelector('.subtotal').textContent.replace('$', '')) || 0
         });
     });
@@ -307,11 +309,11 @@ async function enviarCierre() {
         const response = await fetch('/procesar_cierre', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                efectivo_caja: efectivoCaja, 
-                total_transferencias: totalTransferencias, 
+            body: JSON.stringify({
+                efectivo_caja: efectivoCaja,
+                total_transferencias: totalTransferencias,
                 productos: productos,
-                deudas: listaDeudas 
+                deudas: [] // Array vacío ya que las deudas se gestionan en su vista independiente
             })
         });
 
@@ -320,94 +322,16 @@ async function enviarCierre() {
             alert(res.message);
             window.location.reload();
         } else {
-            alert(res.message);
+            alert("Error: " + res.message);
         }
     } catch (err) {
-        console.error("Error:", err);
+        console.error("Error al procesar cierre:", err);
         alert("Ocurrió un error al procesar el cierre.");
     }
 }
 
-let listaDeudas = [];
-
-function agregarDeuda() {
-    const selectProd = document.getElementById('deuda-producto-select');
-    if (!selectProd || selectProd.options.length === 0) return;
-    
-    const opcionSelected = selectProd.options[selectProd.selectedIndex];
-
-    const productoId = selectProd.value;
-    const productoNombre = opcionSelected.getAttribute('data-nombre');
-    const precioVenta = parseFloat(opcionSelected.getAttribute('data-precio')) || 0;
-
-    const conceptoInput = document.getElementById('deuda-concepto');
-    const concepto = conceptoInput.value.trim() || "Consumo Personal / Dueño";
-
-    const cantidadInput = document.getElementById('deuda-cantidad');
-    const cantidad = parseFloat(cantidadInput.value) || 0;
-
-    if (cantidad <= 0) {
-        alert("La cantidad debe ser mayor a 0");
-        return;
-    }
-
-    listaDeudas.push({
-        id: Date.now(),
-        productoId: productoId,
-        productoNombre: productoNombre,
-        concepto: concepto,
-        cantidad: cantidad,
-        subtotal: cantidad * precioVenta
-    });
-
-    conceptoInput.value = "";
-    cantidadInput.value = "1";
-
-    renderizarDeudas();
-    calcular();
-}
-
-function eliminarDeuda(id) {
-    listaDeudas = listaDeudas.filter(item => item.id !== id);
-    renderizarDeudas();
-    calcular();
-}
-
-function renderizarDeudas() {
-    const container = document.getElementById('tabla-deudas-container');
-    const badgeDeudas = document.getElementById('total-deudas-badge');
-
-    const totalDeudas = listaDeudas.reduce((acc, item) => acc + item.subtotal, 0);
-    if (badgeDeudas) {
-        badgeDeudas.textContent = `Total Deudas: $${totalDeudas.toFixed(2)}`;
-    }
-
-    if (!container) return;
-
-    if (listaDeudas.length === 0) {
-        container.innerHTML = `<tr id="sin-deudas-row"><td colspan="5" class="py-4 text-center text-gray-500 italic">No hay apuntes o deudas registradas en este turno.</td></tr>`;
-        return;
-    }
-
-    let html = '';
-    listaDeudas.forEach(item => {
-        html += `
-            <tr class="hover:bg-gray-800/20">
-                <td class="py-2.5 px-3 font-medium text-white">${item.concepto}</td>
-                <td class="py-2.5 px-3 text-gray-300">${item.productoNombre}</td>
-                <td class="py-2.5 px-3 text-center font-mono text-orange-400">${item.cantidad}</td>
-                <td class="py-2.5 px-3 text-right font-mono text-white">$${item.subtotal.toFixed(2)}</td>
-                <td class="py-2.5 px-3 text-center">
-                    <button type="button" onclick="eliminarDeuda(${item.id})" class="text-rose-400 hover:text-rose-300 font-bold px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 transition">Quitar</button>
-                </td>
-            </tr>
-        `;
-    });
-    container.innerHTML = html;
-} // <-- ¡FALTABA ESTA LLAVE DE CIERRE QUE ROMPÍA TODO EL SCRIPT!
-
 // ==========================================
-// CONSULTA Y MODAL DE DETALLE DE CIERRE
+// DETALLE DE CIERRE DE CAJA (HISTORIAL ADMIN)
 // ==========================================
 async function verDetalleCierre(idCierre) {
     try {
@@ -428,6 +352,13 @@ async function verDetalleCierre(idCierre) {
         document.getElementById('modal-cierre-titulo').textContent = `Detalle del Cierre #${cierre.id}`;
         document.getElementById('modal-cierre-subtitulo').textContent = `Fecha: ${cierre.fecha} | Responsable: ${cierre.usuario_nombre}`;
         document.getElementById('modal-total-esperado').textContent = `$${cierre.total_esperado.toFixed(2)}`;
+        
+        // Asignación de transferencias al modal
+        const elTransf = document.getElementById('modal-total-transferencias');
+        if (elTransf) {
+            elTransf.textContent = `$${(cierre.total_transferencias || 0).toFixed(2)}`;
+        }
+
         document.getElementById('modal-efectivo-caja').textContent = `$${cierre.efectivo_caja.toFixed(2)}`;
 
         const elDif = document.getElementById('modal-diferencia');
@@ -443,67 +374,69 @@ async function verDetalleCierre(idCierre) {
         }
 
         const contenedorPropietarios = document.getElementById('modal-ganancias-propietarios');
-        contenedorPropietarios.innerHTML = '';
+        if (contenedorPropietarios) {
+            contenedorPropietarios.innerHTML = '';
+            const propietariosSet = new Set([
+                ...Object.keys(gananciasPropietarios),
+                ...Object.keys(ventasBrutasPropietarios)
+            ]);
 
-        const propietariosSet = new Set([
-            ...Object.keys(gananciasPropietarios), 
-            ...Object.keys(ventasBrutasPropietarios)
-        ]);
+            if (propietariosSet.size > 0) {
+                propietariosSet.forEach(propietario => {
+                    const ventaBruta = ventasBrutasPropietarios[propietario] || 0.0;
+                    const gananciaFinal = gananciasPropietarios[propietario] || 0.0;
+                    const infoDescuento = descuentosPropietarios[propietario];
 
-        if (propietariosSet.size > 0) {
-            propietariosSet.forEach(propietario => {
-                const ventaBruta = ventasBrutasPropietarios[propietario] || 0.0;
-                const gananciaFinal = gananciasPropietarios[propietario] || 0.0;
-                const infoDescuento = descuentosPropietarios[propietario];
+                    let htmlDescuento = '';
+                    if (infoDescuento && infoDescuento.label) {
+                        htmlDescuento = `
+                            <div class="flex justify-between items-center text-xs text-red-400/90 mt-0.5">
+                                <span>(-) ${infoDescuento.label}:</span>
+                                <span class="font-mono">-$${infoDescuento.monto.toFixed(2)}</span>
+                            </div>
+                        `;
+                    }
 
-                let htmlDescuento = '';
-                if (infoDescuento && infoDescuento.label) {
-                    htmlDescuento = `
-                        <div class="flex justify-between items-center text-xs text-red-400/90 mt-0.5">
-                            <span>(-) ${infoDescuento.label}:</span>
-                            <span class="font-mono">-$${infoDescuento.monto.toFixed(2)}</span>
+                    contenedorPropietarios.innerHTML += `
+                        <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800 text-left flex flex-col justify-between">
+                            <div>
+                                <span class="text-xs font-semibold text-gray-300 block truncate mb-1.5">${propietario}</span>
+                                <div class="flex justify-between items-center text-xs text-gray-400 mb-0.5">
+                                    <span>Venta Bruta:</span>
+                                    <span class="font-mono text-white">$${ventaBruta.toFixed(2)}</span>
+                                </div>
+                                ${htmlDescuento}
+                            </div>
+                            <div class="border-t border-gray-800/80 pt-1.5 mt-2 flex justify-between items-center text-xs">
+                                <span class="text-gray-400 font-medium">Ganancia Neta:</span>
+                                <span class="font-mono font-bold text-orange-400">$${gananciaFinal.toFixed(2)}</span>
+                            </div>
                         </div>
                     `;
-                }
-
-                contenedorPropietarios.innerHTML += `
-                    <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800 text-left flex flex-col justify-between">
-                        <div>
-                            <span class="text-xs font-semibold text-gray-300 block truncate mb-1.5">${propietario}</span>
-                            <div class="flex justify-between items-center text-xs text-gray-400 mb-0.5">
-                                <span>Venta Bruta:</span>
-                                <span class="font-mono text-white">$${ventaBruta.toFixed(2)}</span>
-                            </div>
-                            ${htmlDescuento}
-                        </div>
-                        <div class="border-t border-gray-800/80 pt-1.5 mt-2 flex justify-between items-center text-xs">
-                            <span class="text-gray-400 font-medium">Ganancia Neta:</span>
-                            <span class="font-mono font-bold text-orange-400">$${gananciaFinal.toFixed(2)}</span>
-                        </div>
-                    </div>
-                `;
-            });
-        } else {
-            contenedorPropietarios.innerHTML = `<span class="text-xs text-gray-500 col-span-full">No hay registros de propietarios.</span>`;
+                });
+            } else {
+                contenedorPropietarios.innerHTML = `<span class="text-xs text-gray-500 col-span-full">No hay registros de propietarios.</span>`;
+            }
         }
 
         const tbody = document.getElementById('modal-tabla-detalles');
-        tbody.innerHTML = '';
-
-        detalles.forEach(d => {
-            const tr = document.createElement('tr');
-            tr.className = "hover:bg-gray-800/30 transition-colors";
-            tr.innerHTML = `
-                <td class="p-3 text-white font-medium">${d.nombre_producto}</td>
-                <td class="p-3 text-gray-300">$${d.precio_venta.toFixed(2)}</td>
-                <td class="p-3 text-gray-400 font-mono">${d.stock_inicial}</td>
-                <td class="p-3 text-gray-400 font-mono">${d.entradas}</td>
-                <td class="p-3 text-orange-400 font-bold font-mono">${d.stock_final}</td>
-                <td class="p-3 text-white font-bold font-mono">${d.vendidos}</td>
-                <td class="p-3 text-right font-bold font-mono text-white">$${d.subtotal.toFixed(2)}</td>
-            `;
-            tbody.appendChild(tr);
-        });
+        if (tbody) {
+            tbody.innerHTML = '';
+            detalles.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-800/30 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-3 text-white font-medium">${d.nombre_producto}</td>
+                    <td class="p-3 text-gray-300">$${d.precio_venta.toFixed(2)}</td>
+                    <td class="p-3 text-gray-400 font-mono">${d.stock_inicial}</td>
+                    <td class="p-3 text-gray-400 font-mono">${d.entradas}</td>
+                    <td class="p-3 text-orange-400 font-bold font-mono">${d.stock_final}</td>
+                    <td class="p-3 text-white font-bold font-mono">${d.vendidos}</td>
+                    <td class="p-3 text-right font-bold font-mono text-white">$${d.subtotal.toFixed(2)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
 
         const modal = document.getElementById('modal-detalle-cierre');
         if (modal) {
@@ -512,7 +445,7 @@ async function verDetalleCierre(idCierre) {
         }
 
     } catch (err) {
-        console.error("Error consultando el detalle del cierre:", err);
+        console.error("Error consultando detalle del cierre:", err);
         alert("Ocurrió un error al obtener el detalle del cierre.");
     }
 }
@@ -526,7 +459,7 @@ function cerrarModalDetalleCierre() {
 }
 
 // ==========================================
-// VALIDACIÓN DEL CIERRE DE CAJA
+// VALIDACIÓN DE BOTÓN DE CIERRE
 // ==========================================
 function validarCierreCaja(totalEsperado) {
     const elDineroCaja = document.getElementById('dinero-caja');
@@ -552,15 +485,6 @@ function validarCierreCaja(totalEsperado) {
 // ==========================================
 // UTILIDADES
 // ==========================================
-function actualizarNombreArchivo(input) {
-    const label = document.getElementById('file-label-text');
-    if (input.files && input.files[0]) {
-        label.textContent = input.files[0].name;
-    } else {
-        label.textContent = "Seleccionar archivo .db";
-    }
-}
-
 function calcularSugerenciaVenta() {
     const inputCosto = document.getElementById('precio_costo');
     const inputVenta = document.getElementById('precio_venta');
@@ -572,23 +496,17 @@ function calcularSugerenciaVenta() {
 
     if (costo > 0) {
         const sugerido = (costo * 1.30).toFixed(2);
-        
         if (!inputVenta.value || parseFloat(inputVenta.value) === 0) {
             inputVenta.value = sugerido;
         }
-
-        if (textoSugerencia) {
-            textoSugerencia.textContent = `Sugerido (+30%): $${sugerido}`;
-        }
+        if (textoSugerencia) textoSugerencia.textContent = `Sugerido (+30%): $${sugerido}`;
     } else {
-        if (textoSugerencia) {
-            textoSugerencia.textContent = '';
-        }
+        if (textoSugerencia) textoSugerencia.textContent = '';
     }
 }
 
 // ==========================================
-// INICIALIZACIÓN DE EVENTOS AL CARGAR EL DOM
+// EVENTOS AL CARGAR EL DOM
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     const inputBuscador = document.getElementById('buscador');
@@ -596,5 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
         inputBuscador.addEventListener('keyup', filtrarProductos);
     }
 
-    calcular();
+    if (document.getElementById('tabla-productos')) {
+        calcular();
+    }
 });

@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
-<main class="p-6 space-y-8 flex-1">
+<main class="p-6 space-y-8 flex-1 overflow-y-auto">
     <header class="flex justify-between items-center">
         <div>
             <h1 class="text-2xl font-bold text-white tracking-tight">Gestión Centralizada</h1>
-            <p class="text-sm text-gray-400 mt-0.5">Administración de almacenes, proveedores y propietarios
-            </p>
+            <p class="text-sm text-gray-400 mt-0.5">Administración de almacenes, proveedores y propietarios</p>
         </div>
     </header>
 
+    <!-- ENTIDADES PRINCIPALES (3 Columnas) -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
         <!-- SECCIÓN: ALMACENES -->
@@ -18,7 +18,7 @@
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-lg font-bold text-white">Almacenes / Ubicaciones</h2>
                     <button onclick="abrirModalAlmacen()"
-                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition">
+                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-lg">
                         + Nuevo Almacén
                     </button>
                 </div>
@@ -26,8 +26,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr
-                                class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
+                            <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
                                 <th class="p-3">Nombre</th>
                                 <th class="p-3">Ubicación</th>
                                 <th class="p-3 text-center">Área Venta</th>
@@ -41,8 +40,7 @@
                                 <td class="p-3 text-gray-400">{{ a.ubicacion if a.ubicacion else '-' }}</td>
                                 <td class="p-3 text-center">
                                     {% if a.es_area_venta %}
-                                    <span
-                                        class="px-2 py-0.5 text-xs bg-green-500/10 text-green-400 border border-green-500/20 rounded-full">Sí</span>
+                                    <span class="px-2 py-0.5 text-xs bg-green-500/10 text-green-400 border border-green-500/20 rounded-full">Sí</span>
                                     {% else %}
                                     <span class="px-2 py-0.5 text-xs bg-gray-800 text-gray-400 rounded-full">No</span>
                                     {% endif %}
@@ -50,8 +48,7 @@
                                 <td class="p-3 text-right">
                                     <form action="{{ url_for('eliminar_almacen', id=a.id) }}" method="POST"
                                         onsubmit="return confirm('¿Eliminar almacén?');">
-                                        <button type="submit"
-                                            class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
+                                        <button type="submit" class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
                                     </form>
                                 </td>
                             </tr>
@@ -72,7 +69,7 @@
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-lg font-bold text-white">Proveedores</h2>
                     <button onclick="abrirModalProveedor()"
-                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition">
+                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-lg">
                         + Nuevo Proveedor
                     </button>
                 </div>
@@ -80,8 +77,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr
-                                class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
+                            <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
                                 <th class="p-3">Proveedor</th>
                                 <th class="p-3">Teléfono</th>
                                 <th class="p-3">Contacto</th>
@@ -97,8 +93,7 @@
                                 <td class="p-3 text-right">
                                     <form action="{{ url_for('eliminar_proveedor', id=p.id) }}" method="POST"
                                         onsubmit="return confirm('¿Eliminar proveedor?');">
-                                        <button type="submit"
-                                            class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
+                                        <button type="submit" class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
                                     </form>
                                 </td>
                             </tr>
@@ -119,7 +114,7 @@
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-lg font-bold text-white">Propietarios</h2>
                     <button onclick="abrirModalPropietario()"
-                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition">
+                        class="px-3 py-2 bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold rounded-xl transition shadow-lg">
                         + Nuevo Propietario
                     </button>
                 </div>
@@ -127,8 +122,7 @@
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-sm">
                         <thead>
-                            <tr
-                                class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
+                            <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
                                 <th class="p-3">Nombre</th>
                                 <th class="p-3">Descripción</th>
                                 <th class="p-3 text-right">Acción</th>
@@ -142,15 +136,13 @@
                                 <td class="p-3 text-right">
                                     <form action="{{ url_for('eliminar_propietario', id=prop.id) }}" method="POST"
                                         onsubmit="return confirm('¿Eliminar propietario?');">
-                                        <button type="submit"
-                                            class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
+                                        <button type="submit" class="text-red-400 hover:text-red-300 text-xs font-semibold">Eliminar</button>
                                     </form>
                                 </td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="3" class="p-4 text-center text-gray-500">No hay propietarios registrados.
-                                </td>
+                                <td colspan="3" class="p-4 text-center text-gray-500">No hay propietarios registrados.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -160,9 +152,160 @@
         </section>
 
     </div>
+
+    <!-- SECCIÓN DE BACKUP / RESPALDO DE BASE DE DATOS -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-6 shadow-xl flex items-center justify-between">
+            <div>
+                <h3 class="text-base font-bold text-white">Copia de Seguridad</h3>
+                <p class="text-xs text-gray-400 mt-1">Descarga el archivo completo de la base de datos (.db)</p>
+            </div>
+            <a href="{{ url_for('exportar_db') }}" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 shadow-lg shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                <span>Exportar DB</span>
+            </a>
+        </div>
+
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-6 shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+                <h3 class="text-base font-bold text-white">Restaurar Base de Datos</h3>
+                <p class="text-xs text-gray-400 mt-1">Sube un archivo de respaldo previo para sobrescribir</p>
+            </div>
+            <form action="{{ url_for('importar_db') }}" method="POST" enctype="multipart/form-data" class="flex items-center gap-3 w-full sm:w-auto">
+                <label for="archivo_db" class="cursor-pointer px-3 py-2 bg-[#121316] border border-gray-700 hover:border-orange-500 rounded-xl text-xs text-gray-300 truncate max-w-[160px] inline-block">
+                    <span id="file-label-text">Seleccionar .db</span>
+                    <input type="file" id="archivo_db" name="archivo_db" accept=".db,.sqlite" class="hidden" required onchange="actualizarNombreArchivo(this)">
+                </label>
+                <button type="submit" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-xl text-xs transition shadow-lg shrink-0">
+                    Restaurar
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SECCIÓN GESTIÓN DE TIPOS DE OPERACIÓN Y CONCEPTOS -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- Tipos de Operación -->
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-6 shadow-xl">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span>⚙️</span> Tipos de Operación
+            </h2>
+
+            <form action="{{ url_for('guardar_tipo_operacion') }}" method="POST" class="space-y-3 mb-6">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre</label>
+                    <input type="text" name="nombre" required placeholder="Ej. Donación, Ajuste Interno..."
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Comportamiento Logístico</label>
+                    <select name="comportamiento" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none text-sm">
+                        <option value="traslado">Traslado (Origen ➔ Destino)</option>
+                        <option value="entrada">Entrada (Solo Destino)</option>
+                        <option value="salida">Salida (Solo Origen)</option>
+                    </select>
+                </div>
+                <button type="submit"
+                    class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2.5 rounded-xl transition-all shadow-lg text-sm">
+                    + Crear Tipo de Operación
+                </button>
+            </form>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="text-xs uppercase bg-[#121316] text-gray-400 border-b border-gray-800">
+                        <tr>
+                            <th class="p-3">Nombre</th>
+                            <th class="p-3">Estructura</th>
+                            <th class="p-3 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        {% for t in tipos_operacion %}
+                        <tr class="hover:bg-gray-800/40">
+                            <td class="p-3 font-medium text-white">{{ t.nombre }}</td>
+                            <td class="p-3 text-xs text-gray-400">
+                                {% if t.requiere_origen and t.requiere_destino %} Origen ➔ Destino
+                                {% elif t.requiere_destino %} Solo Destino
+                                {% else %} Solo Origen {% endif %}
+                            </td>
+                            <td class="p-3 text-right">
+                                <form action="{{ url_for('eliminar_tipo_operacion', id=t.id) }}" method="POST" class="inline"
+                                    onsubmit="return confirm('¿Eliminar tipo de operación?');">
+                                    <button type="submit" class="text-red-400 hover:text-red-300 font-semibold text-xs">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Conceptos de Movimiento -->
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-6 shadow-xl">
+            <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                <span>🏷️</span> Conceptos de Movimiento
+            </h2>
+
+            <form action="{{ url_for('guardar_concepto') }}" method="POST" class="space-y-3 mb-6">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Pertenece al Tipo de Operación</label>
+                    <select name="tipo_id" required
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none text-sm">
+                        {% for t in tipos_operacion %}
+                        <option value="{{ t.id }}">{{ t.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre del Concepto</label>
+                    <input type="text" name="nombre" required placeholder="Ej. Reabastecimiento, Rotura..."
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none text-sm">
+                </div>
+                <button type="submit"
+                    class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2.5 rounded-xl transition-all shadow-lg text-sm">
+                    + Crear Concepto
+                </button>
+            </form>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-gray-300">
+                    <thead class="text-xs uppercase bg-[#121316] text-gray-400 border-b border-gray-800">
+                        <tr>
+                            <th class="p-3">Concepto</th>
+                            <th class="p-3">Tipo</th>
+                            <th class="p-3 text-right">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800">
+                        {% for c in conceptos %}
+                        <tr class="hover:bg-gray-800/40">
+                            <td class="p-3 font-medium text-white">{{ c.nombre }}</td>
+                            <td class="p-3 text-xs text-orange-400 font-medium">{{ c.tipo.nombre }}</td>
+                            <td class="p-3 text-right">
+                                <form action="{{ url_for('eliminar_concepto', id=c.id) }}" method="POST" class="inline"
+                                    onsubmit="return confirm('¿Eliminar concepto?');">
+                                    <button type="submit" class="text-red-400 hover:text-red-300 font-semibold text-xs">Eliminar</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
 </main>
 
-<!-- MODAL CREAR ALMACÉN -->
+<!-- MODALES DE CREACIÓN -->
 <div id="modal-almacen" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6">
         <h3 class="text-lg font-bold text-white mb-4">Agregar Almacén</h3>
@@ -178,22 +321,18 @@
                     class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
             </div>
             <div class="flex items-center gap-2 pt-2">
-                <input type="checkbox" name="es_area_venta" id="es_area_venta"
-                    class="rounded bg-[#121316] border-gray-700 text-orange-600 focus:ring-orange-500">
+                <input type="checkbox" name="es_area_venta" id="es_area_venta" class="rounded bg-[#121316] border-gray-700 text-orange-600 focus:ring-orange-500">
                 <label for="es_area_venta" class="text-xs text-gray-300">Marcar como Área de Venta Principal</label>
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="cerrarModalAlmacen()"
-                    class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
+                <button type="button" onclick="cerrarModalAlmacen()" class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
                 <button type="submit" class="px-5 py-2 bg-orange-600 text-white font-bold rounded-xl">Guardar</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL CREAR PROVEEDOR -->
-<div id="modal-proveedor"
-    class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+<div id="modal-proveedor" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6">
         <h3 class="text-lg font-bold text-white mb-4">Agregar Proveedor</h3>
         <form action="{{ url_for('guardar_proveedor') }}" method="POST" class="space-y-4 text-sm">
@@ -213,17 +352,14 @@
                     class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="cerrarModalProveedor()"
-                    class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
+                <button type="button" onclick="cerrarModalProveedor()" class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
                 <button type="submit" class="px-5 py-2 bg-orange-600 text-white font-bold rounded-xl">Guardar</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- MODAL CREAR PROPIETARIO -->
-<div id="modal-propietario"
-    class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+<div id="modal-propietario" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6">
         <h3 class="text-lg font-bold text-white mb-4">Agregar Propietario</h3>
         <form action="{{ url_for('gestionar_propietarios') }}" method="POST" class="space-y-4 text-sm">
@@ -238,168 +374,11 @@
                     class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
             </div>
             <div class="flex justify-end gap-3 mt-6">
-                <button type="button" onclick="cerrarModalPropietario()"
-                    class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
+                <button type="button" onclick="cerrarModalPropietario()" class="px-4 py-2 bg-gray-800 text-gray-300 rounded-xl">Cancelar</button>
                 <button type="submit" class="px-5 py-2 bg-orange-600 text-white font-bold rounded-xl">Guardar</button>
             </div>
         </form>
     </div>
-</div>
-
-<div class="db-tools-container">
-    <!-- Tarjeta Exportar -->
-    <div class="db-card">
-        <div class="db-card-info">
-            <h3>Copia de Seguridad</h3>
-            <p>Descarga el archivo completo de la base de datos (.db)</p>
-        </div>
-        <a href="{{ url_for('exportar_db') }}" class="btn-db btn-export">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            Exportar DB
-        </a>
-    </div>
-
-    <!-- Tarjeta Importar -->
-    <div class="db-card">
-        <div class="db-card-info">
-            <h3>Restaurar Base de Datos</h3>
-            <p>Sube un archivo de respaldo previo para sobrescribir</p>
-        </div>
-        <form action="{{ url_for('importar_db') }}" method="POST" enctype="multipart/form-data" class="restore-form">
-            <label for="archivo_db" class="file-dropzone">
-                <span id="file-label-text">Seleccionar archivo .db</span>
-                <input type="file" id="archivo_db" name="archivo_db" accept=".db,.sqlite" required
-                    onchange="actualizarNombreArchivo(this)">
-            </label>
-            <button type="submit" class="btn-db btn-import">
-                Restaurar
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- SECCIÓN GESTIÓN DE TIPOS DE OPERACIÓN Y CONCEPTOS -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-
-    <!-- Tarjeta: Crear y Listar Tipos de Operación -->
-    <div class="bg-[#18191c] border border-gray-800 rounded-2xl p-6 shadow-xl">
-        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span>⚙️</span> Tipos de Operación
-        </h2>
-
-        <form action="/admin/tipo-operacion/nuevo" method="POST" class="space-y-3 mb-6">
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre</label>
-                <input type="text" name="nombre" required placeholder="Ej. Donación, Ajuste Interno..."
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Comportamiento Logístico</label>
-                <select name="comportamiento" required
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                    <option value="traslado">Traslado (Origen ➔ Destino)</option>
-                    <option value="entrada">Entrada (Solo Destino)</option>
-                    <option value="salida">Salida (Solo Origen)</option>
-                </select>
-            </div>
-            <button type="submit"
-                class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2.5 rounded-xl transition-all shadow-lg shadow-orange-600/20">
-                + Crear Tipo de Operación
-            </button>
-        </form>
-
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-gray-300">
-                <thead class="text-xs uppercase bg-[#121316] text-gray-400 border-b border-gray-800">
-                    <tr>
-                        <th class="p-3">Nombre</th>
-                        <th class="p-3">Estructura</th>
-                        <th class="p-3 text-right">Acción</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-800">
-                    {% for t in tipos_operacion %}
-                    <tr class="hover:bg-gray-800/40">
-                        <td class="p-3 font-medium text-white">{{ t.nombre }}</td>
-                        <td class="p-3 text-xs text-gray-400">
-                            {% if t.requiere_origen and t.requiere_destino %} Origen ➔ Destino
-                            {% elif t.requiere_destino %} Solo Destino
-                            {% else %} Solo Origen {% endif %}
-                        </td>
-                        <td class="p-3 text-right">
-                            <form action="/admin/tipo-operacion/eliminar/{{ t.id }}" method="POST" class="inline"
-                                onsubmit="return confirm('¿Eliminar tipo de operación?');">
-                                <button type="submit"
-                                    class="text-red-400 hover:text-red-300 font-semibold text-xs">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Tarjeta: Crear y Listar Conceptos -->
-    <div class="bg-[#18191c] border border-gray-800 rounded-2xl p-6 shadow-xl">
-        <h2 class="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <span>🏷️</span> Conceptos de Movimiento
-        </h2>
-
-        <form action="/admin/concepto/nuevo" method="POST" class="space-y-3 mb-6">
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Pertenece al Tipo de
-                    Operación</label>
-                <select name="tipo_id" required
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                    {% for t in tipos_operacion %}
-                    <option value="{{ t.id }}">{{ t.nombre }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nombre del Concepto</label>
-                <input type="text" name="nombre" required placeholder="Ej. Reabastecimiento, Rotura..."
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-            </div>
-            <button type="submit"
-                class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold p-2.5 rounded-xl transition-all shadow-lg shadow-orange-600/20">
-                + Crear Concepto
-            </button>
-        </form>
-
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-gray-300">
-                <thead class="text-xs uppercase bg-[#121316] text-gray-400 border-b border-gray-800">
-                    <tr>
-                        <th class="p-3">Concepto</th>
-                        <th class="p-3">Tipo</th>
-                        <th class="p-3 text-right">Acción</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-800">
-                    {% for c in conceptos %}
-                    <tr class="hover:bg-gray-800/40">
-                        <td class="p-3 font-medium text-white">{{ c.nombre }}</td>
-                        <td class="p-3 text-xs text-orange-400 font-medium">{{ c.tipo.nombre }}</td>
-                        <td class="p-3 text-right">
-                            <form action="/admin/concepto/eliminar/{{ c.id }}" method="POST" class="inline"
-                                onsubmit="return confirm('¿Eliminar concepto?');">
-                                <button type="submit"
-                                    class="text-red-400 hover:text-red-300 font-semibold text-xs">Eliminar</button>
-                            </form>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
 </div>
 
 <script>
@@ -411,5 +390,14 @@
 
     function abrirModalPropietario() { document.getElementById('modal-propietario').classList.remove('hidden'); document.getElementById('modal-propietario').classList.add('flex'); }
     function cerrarModalPropietario() { document.getElementById('modal-propietario').classList.remove('flex'); document.getElementById('modal-propietario').classList.add('hidden'); }
+
+    function actualizarNombreArchivo(input) {
+        const label = document.getElementById('file-label-text');
+        if (input && input.files && input.files[0]) {
+            label.textContent = input.files[0].name;
+        } else {
+            label.textContent = "Seleccionar .db";
+        }
+    }
 </script>
 {% endblock %}

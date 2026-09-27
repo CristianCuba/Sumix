@@ -19,6 +19,53 @@ app.register_blueprint(compras_bp)
 # -----------------------------------------------------------------#
 # MODELOS DE BASE DE DATOS
 # -----------------------------------------------------------------#
+# ==========================================
+# MODELOS PARA MÓDULO BALANCE Y PATRIMONIO
+# ==========================================
+
+class PrestamoTercero(db.Model):
+    """Registro de dinero del negocio prestado a personas externas."""
+    __tablename__ = 'prestamos_terceros'
+    id = db.Column(db.Integer, primary_key=True)
+    propietario_id = db.Column(db.Integer, db.ForeignKey('propietarios.id'), nullable=False)
+    deudor_nombre = db.Column(db.String(100), nullable=False)
+    monto = db.Column(db.Float, nullable=False)
+    saldo_pendiente = db.Column(db.Float, nullable=False)
+    concepto = db.Column(db.String(255), nullable=True)
+    fecha = db.Column(db.DateTime, default=db.datetime.utcnow if hasattr(db, 'datetime') else datetime.now)
+    estado = db.Column(db.String(20), default='PENDIENTE') # PENDIENTE, PAGADO
+
+    propietario = db.relationship('Propietario', backref=db.backref('prestamos', lazy=True))
+
+
+class MovimientoCapital(db.Model):
+    """Inyecciones o Retiros de dinero realizados por los propietarios."""
+    __tablename__ = 'movimientos_capital'
+    id = db.Column(db.Integer, primary_key=True)
+    propietario_id = db.Column(db.Integer, db.ForeignKey('propietarios.id'), nullable=False)
+    tipo = db.Column(db.String(20), nullable=False) # 'INYECCION' o 'RETIRO'
+    monto = db.Column(db.Float, nullable=False)
+    metodo_pago = db.Column(db.String(20), default='EFECTIVO') # 'EFECTIVO' o 'TRANSFERENCIA'
+    concepto = db.Column(db.String(255), nullable=True)
+    fecha = db.Column(db.DateTime, default=datetime.now)
+
+    propietario = db.relationship('Propietario', backref=db.backref('movimientos_capital', lazy=True))
+
+
+class SnapshotBalanceDiario(db.Model):
+    """Registro histórico del balance patrimonio al cierre del día."""
+    __tablename__ = 'snapshots_balance_diario'
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False)
+    propietario_nombre = db.Column(db.String(100), nullable=False)
+    efectivo = db.Column(db.Float, default=0.0)
+    transferencia = db.Column(db.Float, default=0.0)
+    inventario_costo = db.Column(db.Float, default=0.0)
+    deudas_por_cobrar = db.Column(db.Float, default=0.0)
+    prestamos_otorgados = db.Column(db.Float, default=0.0)
+    inyecciones = db.Column(db.Float, default=0.0)
+    retiros = db.Column(db.Float, default=0.0)
+    patrimonio_total = db.Column(db.Float, default=0.0)
 
 class Compra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -151,12 +198,13 @@ class CierreDia(db.Model):
 class DeudaCierre(db.Model):
     __tablename__ = 'deudas_cierre'
     id = db.Column(db.Integer, primary_key=True)
-    cierre_id = db.Column(db.Integer, db.ForeignKey('cierres_dia.id'), nullable=False)
-    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
-    producto_nombre = db.Column(db.String(100), nullable=False)
+    cierre_id = db.Column(db.Integer, db.ForeignKey('cierres_dia.id'), nullable=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
+    producto_nombre = db.Column(db.String(100), nullable=True)
     concepto = db.Column(db.String(150), nullable=False)
-    cantidad = db.Column(db.Float, default=0.0)
+    cantidad = db.Column(db.Float, default=1.0)
     subtotal = db.Column(db.Float, default=0.0)
+    estado = db.Column(db.String(20), default='pendiente')
 
 
 class DetalleCierre(db.Model):
@@ -165,6 +213,7 @@ class DetalleCierre(db.Model):
     cierre_id = db.Column(db.Integer, db.ForeignKey('cierres_dia.id'), nullable=False)
     producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
     nombre_producto = db.Column(db.String(100), nullable=False)
+    propietario_nombre = db.Column(db.String(100), nullable=True) # <-- Nueva columna histórica
     precio_venta = db.Column(db.Float, default=0.0)
     stock_inicial = db.Column(db.Float, default=0.0)
     entradas = db.Column(db.Float, default=0.0)
@@ -206,6 +255,203 @@ class HistorialPago(db.Model):
 # -----------------------------------------------------------------#
 from flask import jsonify
 from datetime import date
+from datetime import datetime, date
+
+# ==========================================
+# RUTAS PARA EL MÓDULO DE BALANCE Y PATRIMONIO
+# ==========================================
+
+def obtener_stock_total(producto):
+    """Calcula el stock total de un producto considerando si 'stocks' es una lista/relación o un valor entero."""
+    if hasattr(producto, 'stocks'):
+        if isinstance(producto.stocks, (list, tuple)) or hasattr(producto.stocks, '__iter__'):
+            return sum(getattr(s, 'cantidad', getattr(s, 'stock', 0)) for s in producto.stocks)
+        return producto.stocks or 0
+    return getattr(producto, 'stock', 0)
+
+
+@app.route('/admin/balance')
+def vista_balance():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
+    propietarios = Propietario.query.all()
+    balance_propietarios = []
+
+    for prop in propietarios:
+        # 1. Capital Invertido en Mercado/Productos (Valor a Costo)
+        productos_prop = Producto.query.filter_by(propietario_id=prop.id).all()
+        inventario_costo = sum((obtener_stock_total(p) * (p.precio_costo or 0.0)) for p in productos_prop)
+
+        # 2. Deudas por Cobrar
+        deudas_cobrar = 0.0
+        if 'Deuda' in globals():
+            try:
+                deudas = Deuda.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
+                deudas_cobrar = sum(getattr(d, 'monto_pendiente', d.monto or 0.0) for d in deudas)
+            except Exception:
+                deudas_cobrar = 0.0
+
+        # 3. Préstamos Otorgados a terceros
+        prestamos = PrestamoTercero.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
+        total_prestamos = sum(p.saldo_pendiente for p in prestamos)
+
+        # 4. Inyecciones y Retiros manuales
+        movs = MovimientoCapital.query.filter_by(propietario_id=prop.id).all()
+        total_inyecciones = sum(m.monto for m in movs if m.tipo == 'INYECCION')
+        total_retiros = sum(m.monto for m in movs if m.tipo == 'RETIRO')
+
+        # 5. Efectivo Acumulado por Cierres y Transferencias
+        efectivo_acumulado = 0.0
+        transferencias_acumuladas = 0.0
+
+        # Evaluar si el propietario actual es Cristian (para asignarle todas las transferencias)
+        es_cristian = 'CRISTIAN' in prop.nombre.upper()
+
+        if 'CierreDia' in globals():
+            cierres = CierreDia.query.all()
+            for c in cierres:
+                if hasattr(c, 'detalles'):
+                    for d in c.detalles:
+                        prod = Producto.query.get(d.producto_id)
+                        if prod and prod.propietario_id == prop.id:
+                            efectivo_acumulado += (d.subtotal or 0.0)
+                
+                # Asignar el 100% de las transferencias únicamente a Cristian
+                if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
+                    transferencias_acumuladas += (c.total_transferencias or 0.0)
+
+        # Efectivo Líquido final = Cierres + Inyecciones - Retiros - Préstamos
+        efectivo_liquido = max(0.0, efectivo_acumulado + total_inyecciones - total_retiros - total_prestamos)
+
+        # Patrimonio Neto Total
+        patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + deudas_cobrar + total_prestamos
+
+        balance_propietarios.append({
+            'propietario': prop,
+            'efectivo': efectivo_liquido,
+            'transferencia': transferencias_acumuladas,
+            'inventario_costo': inventario_costo,
+            'deudas_por_cobrar': deudas_cobrar,
+            'prestamos': total_prestamos,
+            'inyecciones': total_inyecciones,
+            'retiros': total_retiros,
+            'patrimonio_total': patrimonio_total
+        })
+
+    # Histórico de Snapshots y préstamos activos
+    snapshots = SnapshotBalanceDiario.query.order_by(SnapshotBalanceDiario.fecha.desc()).limit(30).all()
+    prestamos_activos = PrestamoTercero.query.filter_by(estado='PENDIENTE').all()
+
+    return render_template(
+        'admin_balance.html',
+        balance_propietarios=balance_propietarios,
+        snapshots=snapshots,
+        prestamos=prestamos_activos,
+        propietarios=propietarios
+    )
+
+
+@app.route('/admin/balance/movimiento', methods=['POST'])
+def registrar_movimiento_capital():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
+
+    data = request.json or {}
+    try:
+        nuevo_mov = MovimientoCapital(
+            propietario_id=int(data['propietario_id']),
+            tipo=data['tipo'],  # 'INYECCION' o 'RETIRO'
+            monto=float(data['monto']),
+            metodo_pago=data.get('metodo_pago', 'EFECTIVO'),
+            concepto=data.get('concepto', '')
+        )
+        db.session.add(nuevo_mov)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Movimiento registrado correctamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/admin/balance/prestamo', methods=['POST'])
+def registrar_prestamo():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
+
+    data = request.json or {}
+    try:
+        nuevo_prestamo = PrestamoTercero(
+            propietario_id=int(data['propietario_id']),
+            deudor_nombre=data['deudor_nombre'],
+            monto=float(data['monto']),
+            saldo_pendiente=float(data['monto']),
+            concepto=data.get('concepto', '')
+        )
+        db.session.add(nuevo_prestamo)
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Préstamo registrado correctamente'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/admin/balance/guardar-snapshot', methods=['POST'])
+def guardar_snapshot_diario():
+    if 'user' not in session or session.get('rol') != 'admin':
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
+
+    try:
+        hoy = date.today()
+        propietarios = Propietario.query.all()
+
+        for prop in propietarios:
+            SnapshotBalanceDiario.query.filter_by(fecha=hoy, propietario_nombre=prop.nombre).delete()
+
+            productos_prop = Producto.query.filter_by(propietario_id=prop.id).all()
+            inventario_costo = sum((obtener_stock_total(p) * (p.precio_costo or 0.0)) for p in productos_prop)
+
+            prestamos = PrestamoTercero.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
+            total_prestamos = sum(p.saldo_pendiente for p in prestamos)
+
+            movs = MovimientoCapital.query.filter_by(propietario_id=prop.id).all()
+            total_inyecciones = sum(m.monto for m in movs if m.tipo == 'INYECCION')
+            total_retiros = sum(m.monto for m in movs if m.tipo == 'RETIRO')
+
+            efectivo_acumulado = 0.0
+            transferencias_acumuladas = 0.0
+            es_cristian = 'CRISTIAN' in prop.nombre.upper()
+
+            if 'CierreDia' in globals():
+                cierres = CierreDia.query.all()
+                for c in cierres:
+                    if hasattr(c, 'detalles'):
+                        for d in c.detalles:
+                            prod = Producto.query.get(d.producto_id)
+                            if prod and prod.propietario_id == prop.id:
+                                efectivo_acumulado += (d.subtotal or 0.0)
+                    if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
+                        transferencias_acumuladas += (c.total_transferencias or 0.0)
+
+            efectivo_liquido = max(0.0, efectivo_acumulado + total_inyecciones - total_retiros - total_prestamos)
+            patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + total_prestamos
+
+            snap = SnapshotBalanceDiario(
+                fecha=hoy,
+                propietario_nombre=prop.nombre,
+                inventario_costo=inventario_costo,
+                prestamos_otorgados=total_prestamos,
+                inyecciones=total_inyecciones,
+                retiros=total_retiros,
+                patrimonio_total=patrimonio_total
+            )
+            db.session.add(snap)
+
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Snapshot congelado en el historial.'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @app.context_processor
 def inject_today():
@@ -234,6 +480,77 @@ def pagar_cuenta(id):
         db.session.commit()
 
     return redirect(url_for('cuentas_por_pagar'))
+# -----------------------------------------------------------------#
+# RUTAS DE DEUDAS Y FIADOS (ACCESIBLE PARA DEPENDIENTES Y ADMINS)
+# -----------------------------------------------------------------#
+@app.route('/deudas')
+def vista_deudas():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    productos = Producto.query.all()
+    deudas_pendientes = DeudaCierre.query.filter_by(estado='pendiente').order_by(DeudaCierre.id.desc()).all()
+    deudas_cobradas = DeudaCierre.query.filter_by(estado='pagado').order_by(DeudaCierre.id.desc()).limit(20).all()
+    
+    total_pendiente = sum(d.subtotal for d in deudas_pendientes if d.subtotal)
+
+    return render_template(
+        'deudas.html', 
+        productos=productos, 
+        deudas=deudas_pendientes, 
+        historial=deudas_cobradas,
+        total_pendiente=total_pendiente
+    )
+
+
+@app.route('/deudas/nueva', methods=['POST'])
+def guardar_deuda():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    concepto = request.form.get('concepto', '').strip()
+    producto_id = request.form.get('producto_id', type=int)
+    cantidad = request.form.get('cantidad', type=float, default=1.0)
+
+    if not concepto or cantidad <= 0:
+        flash("Ingresa un concepto/deudor válido.", "danger")
+        return redirect(url_for('vista_deudas'))
+
+    prod_nombre = ""
+    subtotal = 0.0
+
+    if producto_id:
+        prod = Producto.query.get(producto_id)
+        if prod:
+            prod_nombre = prod.nombre
+            subtotal = cantidad * prod.precio_venta
+
+    nueva_deuda = DeudaCierre(
+        concepto=concepto,
+        producto_id=producto_id if producto_id else 0,
+        producto_nombre=prod_nombre,
+        cantidad=cantidad,
+        subtotal=subtotal,
+        estado='pendiente'
+    )
+
+    db.session.add(nueva_deuda)
+    db.session.commit()
+    flash("Deuda / Fiado registrado correctamente.", "success")
+    return redirect(url_for('vista_deudas'))
+
+
+@app.route('/deudas/cobrar/<int:id>', methods=['POST'])
+def cobrar_deuda(id):
+    if 'user' not in session:
+        return redirect(url_for('login'))
+
+    deuda = DeudaCierre.query.get_or_404(id)
+    deuda.estado = 'pagado'
+
+    db.session.commit()
+    flash(f"Deuda de '{deuda.concepto}' marcada como cobrada.", "success")
+    return redirect(url_for('vista_deudas'))
 
 @app.route('/api/tipos_operacion', methods=['GET'])
 def api_tipos_operacion():
@@ -505,11 +822,7 @@ def vista_cierre():
         prod.stock_en_almacen = cantidad_actual
         prod.stock_final_inicial = cantidad_actual
 
-    # NUEVO: Buscar las deudas registradas en los cierres para que no desaparezcan de la vista
-    # (Si quieres filtrarlas por almacén o mostrar todas las activas, puedes ajustarlo aquí)
-    deudas_pendientes = DeudaCierre.query.all()
-
-    return render_template('cierre.html', productos=productos, deudas_pendientes=deudas_pendientes)
+    return render_template('cierre.html', productos=productos)
 
 import json
 
@@ -810,14 +1123,18 @@ def procesar_cierre():
             vendidos = float(p_data.get('vendidos', 0.0))
             subtotal = float(p_data.get('subtotal', 0.0))
 
+            # Dentro del loop for p_data in productos_cierre:
             producto = Producto.query.get(p_id)
             if producto:
                 stock_inicial_calculado = stock_final + vendidos - entradas
+                
+                prop_nombre = producto.propietario.nombre if producto.propietario else "Sin Propietario"
                 
                 detalle = DetalleCierre(
                     cierre_id=nuevo_cierre.id,
                     producto_id=producto.id,
                     nombre_producto=producto.nombre,
+                    propietario_nombre=prop_nombre, # <-- Guardamos la foto del propietario
                     precio_venta=producto.precio_venta,
                     stock_inicial=stock_inicial_calculado,
                     entradas=entradas,
@@ -921,15 +1238,21 @@ def obtener_detalle_cierre(id_cierre):
     
     ganancias_por_propietario = {}
     ventas_brutas_por_propietario = {}
-    descuentos_por_propietario = {}  # <-- Para almacenar las deducciones explicadas
+    descuentos_por_propietario = {}
 
     for d in cierre.detalles:
-        producto = Producto.query.get(d.producto_id)
+        producto = db.session.get(Producto, d.producto_id) if hasattr(db, 'session') else Producto.query.get(d.producto_id)
         precio_costo = producto.precio_costo if producto else 0.0
         
-        propietario_nombre = "Sin Propietario"
-        if producto and producto.propietario:
+        # 1° Revisa si el detalle tiene el propietario guardado históricamente
+        # 2° Si no, busca el propietario del Producto en BD
+        # 3° Si el producto fue borrado y no tiene registro, asigna "Sin Propietario"
+        if hasattr(d, 'propietario_nombre') and d.propietario_nombre:
+            propietario_nombre = d.propietario_nombre
+        elif producto and producto.propietario:
             propietario_nombre = producto.propietario.nombre
+        else:
+            propietario_nombre = "Sin Propietario"
 
         ganancia_item = d.vendidos * (d.precio_venta - precio_costo)
         venta_bruta_item = d.subtotal
@@ -982,13 +1305,14 @@ def obtener_detalle_cierre(id_cierre):
             'fecha': cierre.fecha.strftime('%d/%m/%Y %I:%M %p'),
             'usuario_nombre': cierre.usuario_nombre,
             'total_esperado': cierre.total_esperado,
+            'total_transferencias': cierre.total_transferencias or 0.0,
             'efectivo_caja': cierre.efectivo_caja,
             'diferencia': cierre.diferencia
         },
         'detalles': detalles,
         'ganancias_propietarios': ganancias_por_propietario,
         'ventas_brutas_propietarios': ventas_brutas_por_propietario,
-        'descuentos_propietarios': descuentos_por_propietario  # <-- Enviamos los detalles de las deducciones
+        'descuentos_propietarios': descuentos_por_propietario
     })
 # -----------------------------------------------------------------#
 # CUENTAS POR PAGAR

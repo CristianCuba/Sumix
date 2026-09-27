@@ -10,8 +10,7 @@
             <h1 class="text-2xl font-bold text-white tracking-tight">SUMIX <span
                     class="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-800 text-orange-400 border border-orange-500/20">Módulo
                     de Compras</span></h1>
-            <p class="text-sm text-gray-400 mt-0.5">Control de efectivo disponible y presupuesto para reabastecimiento
-            </p>
+            <p class="text-sm text-gray-400 mt-0.5">Control de efectivo disponible y presupuesto para reabastecimiento</p>
         </div>
     </header>
 
@@ -32,16 +31,14 @@
         <!-- Total Gastado en la Lista -->
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl">
             <span class="block text-xs font-semibold text-gray-400 uppercase mb-2">Total de la Compra</span>
-            <div class="text-3xl font-extrabold text-white font-mono tracking-tight mt-2" id="total-compra-texto">$0.00
-            </div>
+            <div class="text-3xl font-extrabold text-white font-mono tracking-tight mt-2" id="total-compra-texto">$0.00</div>
             <p class="text-xs text-gray-500 mt-2">Suma acumulada de los productos agregados.</p>
         </div>
 
         <!-- Efectivo Restante -->
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-5 shadow-xl">
             <span class="block text-xs font-semibold text-gray-400 uppercase mb-2">Efectivo Restante (Resto)</span>
-            <div class="text-3xl font-extrabold font-mono tracking-tight mt-2 text-emerald-400"
-                id="efectivo-restante-texto">$0.00</div>
+            <div class="text-3xl font-extrabold font-mono tracking-tight mt-2 text-emerald-400" id="efectivo-restante-texto">$0.00</div>
             <p class="text-xs text-gray-500 mt-2" id="alerta-presupuesto">Dinero libre tras la selección.</p>
         </div>
     </div>
@@ -56,8 +53,7 @@
             Agregar Producto a la Compra
         </h2>
 
-        <div
-            class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-[#121316] p-4 rounded-xl border border-gray-800">
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-[#121316] p-4 rounded-xl border border-gray-800">
             <div class="sm:col-span-4">
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Producto</label>
                 <input type="text" id="compra-nombre-prod" placeholder="Ej. Cerveza, Atún..."
@@ -88,7 +84,7 @@
             </div>
             <div class="sm:col-span-2">
                 <button type="button" onclick="agregarItemCompra()"
-                    class="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1 shadow-lg">
+                    class="w-full py-2.5 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-xs transition-all flex items-center justify-center gap-1 shadow-lg active:scale-95">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
@@ -101,7 +97,7 @@
         <div class="overflow-x-auto mt-4">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
-                    <tr class="text-gray-400 border-b border-gray-800">
+                    <tr class="text-gray-400 border-b border-gray-800 bg-[#121316]">
                         <th class="py-2.5 px-3">Producto</th>
                         <th class="py-2.5 px-3">Proveedor</th>
                         <th class="py-2.5 px-3 text-center">Cantidad</th>
@@ -112,17 +108,16 @@
                 </thead>
                 <tbody id="tabla-compras-container" class="divide-y divide-gray-800/40">
                     <tr id="sin-compras-row">
-                        <td colspan="6" class="py-6 text-center text-gray-500 italic">No has agregado ningún producto a
-                            la lista de compra.</td>
+                        <td colspan="6" class="py-6 text-center text-gray-500 italic">No has agregado ningún producto a la lista de compra.</td>
                     </tr>
                 </tbody>
             </table>
         </div>
 
-        <!-- Botón para Guardar la Compra Definitiva en la Base de Datos -->
+        <!-- Botón para Guardar la Compra Definitiva -->
         <div class="flex justify-end pt-4 border-t border-gray-800">
             <button type="button" onclick="guardarCompraDefinitiva()"
-                class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center gap-2">
+                class="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl text-sm transition-all shadow-lg flex items-center gap-2 active:scale-95">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
@@ -148,21 +143,17 @@
                     <p class="text-xs text-gray-500 italic">Cargando historial...</p>
                 </div>
             </div>
-        
+
             <!-- Desglose por Proveedor -->
             <div class="lg:col-span-2 bg-[#121316] p-5 rounded-xl border border-gray-800 flex flex-col justify-between">
                 <div>
-                    <div
-                        class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-gray-800 pb-3 mb-4 gap-2">
-                        <h3 id="detalle-titulo-fecha" class="text-sm font-bold text-white">Selecciona una compra de la izquierda
-                        </h3>
-            
-                        <!-- Contenedor para alinear correctamente el efectivo y el botón de WhatsApp -->
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-gray-800 pb-3 mb-4 gap-2">
+                        <h3 id="detalle-titulo-fecha" class="text-sm font-bold text-white">Selecciona una compra de la izquierda</h3>
+
                         <div class="flex items-center gap-2 flex-wrap">
                             <span id="detalle-efectivo-inicial"
-                                class="text-xs px-2.5 py-1 rounded-full bg-gray-800 text-orange-400 font-mono">Efectivo en mano:
-                                $0.00</span>
-            
+                                class="text-xs px-2.5 py-1 rounded-full bg-gray-800 text-orange-400 font-mono">Efectivo en mano: $0.00</span>
+
                             <button type="button" id="btn-enviar-whatsapp" onclick="enviarCompraWhatsApp()"
                                 class="hidden px-3 py-1 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-lg text-xs font-bold transition-all border border-emerald-500/30 flex items-center gap-1.5"
                                 title="Enviar lista por WhatsApp">
@@ -174,7 +165,7 @@
                             </button>
                         </div>
                     </div>
-            
+
                     <div id="contenedor-desglose-proveedores" class="space-y-6 max-h-[380px] overflow-y-auto pr-2">
                         <div class="text-center py-12 text-gray-500 italic text-xs">
                             Aquí verás los productos agrupados por cada proveedor y el dinero exacto que debes llevar preparado.
@@ -187,9 +178,10 @@
 
 </main>
 
-<!-- Lógica JavaScript para el cálculo, guardado e historial -->
 <script>
     let listaCompra = [];
+    let isDeleting = false;
+    let compraSeleccionadaActual = null;
 
     document.addEventListener("DOMContentLoaded", () => {
         cargarHistorialCompras();
@@ -261,60 +253,15 @@
         container.innerHTML = html;
         calcularPresupuesto();
     }
-    let isDeleting = false;
 
-        function eliminarCompraActual(id) {
-            if (isDeleting) return;
-
-            if (!confirm("¿Estás seguro de que deseas eliminar esta lista de compras planificada?")) {
-                return;
-            }
-
-            isDeleting = true;
-
-            fetch(`/api/compras/${id}`, {
-                method: 'DELETE'
-            })
-                .then(res => res.json())
-                .then(data => {
-                    isDeleting = false;
-                    if (data.success) {
-                        // Forzamos la limpieza inmediata del panel derecho sin depender de condiciones estrictas
-                        compraIdSeleccionada = null;
-                        document.getElementById('detalle-titulo-fecha').textContent = "Selecciona una compra de la izquierda";
-                        document.getElementById('detalle-efectivo-inicial').textContent = "Efectivo en mano: $0.00";
-                        document.getElementById('contenedor-desglose-proveedores').innerHTML = `
-                <div class="text-center py-12 text-gray-500 italic text-xs">
-                    Aquí verás los productos agrupados por cada proveedor y el dinero exacto que debes llevar preparado.
-                </div>
-            `;
-
-                        // Recargar la lista del historial inmediatamente
-                        cargarHistorialCompras();
-                    } else {
-                        alert("Error: " + data.mensaje);
-                    }
-                })
-                .catch(err => {
-                    isDeleting = false;
-                    console.error("Error al eliminar:", err);
-                    cargarHistorialCompras();
-                });
-        }
-
-        function eliminarItemCompra(id) {
-            listaCompra = listaCompra.filter(item => item.id !== id);
-            renderizarCompra();
-        }
+    function eliminarItemCompra(id) {
+        listaCompra = listaCompra.filter(item => item.id !== id);
+        renderizarCompra();
+    }
 
     function calcularPresupuesto() {
         const efectivoMano = parseFloat(document.getElementById('efectivo-mano').value) || 0;
-
-        let totalCompra = 0;
-        listaCompra.forEach(item => {
-            totalCompra += item.subtotal;
-        });
-
+        let totalCompra = listaCompra.reduce((acc, item) => acc + item.subtotal, 0);
         const efectivoRestante = efectivoMano - totalCompra;
 
         document.getElementById('total-compra-texto').textContent = `$${totalCompra.toFixed(2)}`;
@@ -350,30 +297,28 @@
 
         fetch('/api/guardar_compra', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.mensaje);
-                    listaCompra = [];
-                    document.getElementById('efectivo-mano').value = "0.00";
-                    renderizarCompra();
-                    cargarHistorialCompras(); // Recargar la lista de la izquierda automáticamente
-                } else {
-                    alert("Error: " + data.mensaje);
-                }
-            })
-            .catch(error => {
-                console.error('Error de red:', error);
-                alert("Ocurrió un error al intentar conectar con el servidor.");
-            });
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.mensaje);
+                listaCompra = [];
+                document.getElementById('efectivo-mano').value = "0.00";
+                renderizarCompra();
+                cargarHistorialCompras();
+            } else {
+                alert("Error: " + data.mensaje);
+            }
+        })
+        .catch(error => {
+            console.error('Error de red:', error);
+            alert("Ocurrió un error al intentar conectar con el servidor.");
+        });
     }
 
-   function cargarHistorialCompras() {
+    function cargarHistorialCompras() {
         fetch('/api/historial_compras')
             .then(res => res.json())
             .then(data => {
@@ -404,30 +349,23 @@
             .catch(err => console.error("Error cargando historial:", err));
     }
 
-    // Variable global para almacenar los datos de la compra seleccionada actual
-        let compraSeleccionadaActual = null;
+    function verDetalleCompra(compra) {
+        compraSeleccionadaActual = compra;
+        document.getElementById('btn-enviar-whatsapp').classList.remove('hidden');
 
-        // Modifica o asegúrate de que tu función verDetalleCompra guarde el objeto completo:
-        function verDetalleCompra(compra) {
-                compraSeleccionadaActual = compra; // Guardamos la compra completa aquí
+        document.getElementById('detalle-titulo-fecha').textContent = `Compra del: ${compra.fecha}`;
+        document.getElementById('detalle-efectivo-inicial').textContent = `Efectivo en mano: $${compra.efectivo_inicial.toFixed(2)}`;
 
-                // Mostramos el botón de WhatsApp al seleccionar una compra
-                document.getElementById('btn-enviar-whatsapp').classList.remove('hidden');
+        const contenedor = document.getElementById('contenedor-desglose-proveedores');
 
-                document.getElementById('detalle-titulo-fecha').textContent = `Compra del: ${compra.fecha}`;
-                document.getElementById('detalle-efectivo-inicial').textContent = `Efectivo en mano: $${compra.efectivo_inicial.toFixed(2)}`;
+        if (!compra.por_proveedor || compra.por_proveedor.length === 0) {
+            contenedor.innerHTML = `<div class="text-center py-12 text-gray-500 italic text-xs">No hay productos en esta compra.</div>`;
+            return;
+        }
 
-                const contenedor = document.getElementById('contenedor-desglose-proveedores');
-
-                // Usamos 'por_proveedor' tal como lo envía Flask
-                if (!compra.por_proveedor || compra.por_proveedor.length === 0) {
-                    contenedor.innerHTML = `<div class="text-center py-12 text-gray-500 italic text-xs">No hay productos en esta compra.</div>`;
-                    return;
-                }
-
-                let html = '';
-                compra.por_proveedor.forEach(prov => {
-                    html += `
+        let html = '';
+        compra.por_proveedor.forEach(prov => {
+            html += `
             <div class="bg-[#16171a] border border-gray-800 rounded-xl p-4">
                 <div class="flex items-center justify-between border-b border-gray-800 pb-2 mb-3">
                     <span class="text-xs font-bold text-orange-400 uppercase">🏢 Proveedor: ${prov.proveedor}</span>
@@ -444,45 +382,76 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-800/40">
-        `;
-                    prov.productos.forEach(prod => {
-                        html += `
+            `;
+            prov.productos.forEach(prod => {
+                html += `
                 <tr>
                     <td class="py-2 text-white font-medium">${prod.producto}</td>
                     <td class="py-2 text-center text-gray-300">${prod.cantidad}</td>
                     <td class="py-2 text-right text-gray-400 font-mono">$${prod.precio.toFixed(2)}</td>
                     <td class="py-2 text-right text-emerald-400 font-mono font-bold">$${prod.subtotal.toFixed(2)}</td>
                 </tr>
-            `;
-                    });
-                    html += `</tbody></table></div></div>`;
-                });
-                contenedor.innerHTML = html;
-            }
-        // Función para formatear y enviar por WhatsApp
-        function enviarCompraWhatsApp() {
-                if (!compraSeleccionadaActual) return;
+                `;
+            });
+            html += `</tbody></table></div></div>`;
+        });
+        contenedor.innerHTML = html;
+    }
 
-                let mensaje = `📋 *SUMIX* \n`;
-                mensaje += `📅 Fecha: ${compraSeleccionadaActual.fecha}\n`;
-                mensaje += `-----------------------------------\n\n`;
+    function eliminarCompraActual(id) {
+        if (isDeleting) return;
+        if (!confirm("¿Estás seguro de que deseas eliminar esta lista de compras planificada?")) return;
 
-                compraSeleccionadaActual.por_proveedor.forEach(prov => {
-                    mensaje += `🏢 *PROVEEDOR: ${prov.proveedor.toUpperCase()}*\n`;
-                    mensaje += `Productos:\n`;
-                  
-                    prov.productos.forEach(prod => {
-                        mensaje += `  ▪️ ${prod.producto} (Cant: ${prod.cantidad})($: ${prod.precio}) - $${prod.subtotal.toFixed(2)}\n`;
-                    });
-                    mensaje += `💰 *Total a Pagar: $${prov.total_proveedor.toFixed(2)}*\n`;
-                    mensaje += `\n-----------------------------------\n\n`;
-                });
+        isDeleting = true;
 
-                mensaje += `Total General de la Compra: $${compraSeleccionadaActual.total_compra.toFixed(2)}`;
+        fetch(`/api/compras/${id}`, { method: 'DELETE' })
+            .then(res => res.json())
+            .then(data => {
+                isDeleting = false;
+                if (data.success) {
+                    compraSeleccionadaActual = null;
+                    document.getElementById('btn-enviar-whatsapp').classList.add('hidden');
+                    document.getElementById('detalle-titulo-fecha').textContent = "Selecciona una compra de la izquierda";
+                    document.getElementById('detalle-efectivo-inicial').textContent = "Efectivo en mano: $0.00";
+                    document.getElementById('contenedor-desglose-proveedores').innerHTML = `
+                        <div class="text-center py-12 text-gray-500 italic text-xs">
+                            Aquí verás los productos agrupados por cada proveedor y el dinero exacto que debes llevar preparado.
+                        </div>
+                    `;
+                    cargarHistorialCompras();
+                } else {
+                    alert("Error: " + data.mensaje);
+                }
+            })
+            .catch(err => {
+                isDeleting = false;
+                console.error("Error al eliminar:", err);
+                cargarHistorialCompras();
+            });
+    }
 
-                const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
-                window.open(url, '_blank');
-            }
+    function enviarCompraWhatsApp() {
+        if (!compraSeleccionadaActual) return;
+
+        let mensaje = `📋 *SUMIX* \n`;
+        mensaje += `📅 Fecha: ${compraSeleccionadaActual.fecha}\n`;
+        mensaje += `-----------------------------------\n\n`;
+
+        compraSeleccionadaActual.por_proveedor.forEach(prov => {
+            mensaje += `🏢 *PROVEEDOR: ${prov.proveedor.toUpperCase()}*\n`;
+            mensaje += `Productos:\n`;
+            prov.productos.forEach(prod => {
+                mensaje += `  ▪️ ${prod.producto} (Cant: ${prod.cantidad})($: ${prod.precio}) - $${prod.subtotal.toFixed(2)}\n`;
+            });
+            mensaje += `💰 *Total a Pagar: $${prov.total_proveedor.toFixed(2)}*\n`;
+            mensaje += `\n-----------------------------------\n\n`;
+        });
+
+        mensaje += `Total General de la Compra: $${compraSeleccionadaActual.total_compra.toFixed(2)}`;
+
+        const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
+        window.open(url, '_blank');
+    }
 </script>
 
 {% endblock %}
