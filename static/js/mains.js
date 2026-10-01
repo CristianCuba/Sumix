@@ -268,7 +268,12 @@ function calcular() {
     const inputTransferencia = document.getElementById('dinero-transferencia');
     const totalTransferencias = inputTransferencia ? (parseFloat(inputTransferencia.value) || 0) : 0;
 
-    let totalEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias;
+    // --- NUEVO: Extraer deudas del día ---
+    const inputDeudas = document.getElementById('deudas-dia');
+    const deudasDia = inputDeudas ? (parseFloat(inputDeudas.value) || 0) : 0;
+
+    // --- MODIFICADO: Restar las deudas al total esperado ---
+    let totalEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias - deudasDia;
 
     const elemTotalEsperado = document.getElementById('total-esperado');
     const elemComisionDayana = document.getElementById('txt-comision-dayana');
@@ -282,6 +287,31 @@ function calcular() {
 
     if (elemComisionDayana) elemComisionDayana.textContent = `$${comisionDayana.toFixed(2)}`;
     if (elemSalarioCristian) elemSalarioCristian.textContent = `$${descuentoCristian.toFixed(2)}`;
+
+    // --- NUEVO: Calcular y colorear Diferencia ---
+    const inputEfectivo = document.getElementById('dinero-caja');
+    const efectivoCaja = inputEfectivo ? (parseFloat(inputEfectivo.value) || 0) : 0;
+
+    let diferencia = efectivoCaja - totalEsperado;
+
+    const diffInput = document.getElementById('diferencia-caja');
+    const diffIcon = document.getElementById('icono-diferencia');
+
+    if (diffInput && diffIcon) {
+        diffInput.value = diferencia.toFixed(2);
+        
+        let baseClasses = "w-28 bg-[#121316] border rounded-xl pl-7 pr-3 py-2.5 text-lg font-bold font-mono focus:outline-none cursor-not-allowed ";
+        if (diferencia < 0) {
+            diffInput.className = baseClasses + "border-rose-900/50 text-rose-400";
+            diffIcon.className = "absolute left-3 top-1/2 -translate-y-1/2 font-bold text-rose-400";
+        } else if (diferencia > 0) {
+            diffInput.className = baseClasses + "border-emerald-900/50 text-emerald-400";
+            diffIcon.className = "absolute left-3 top-1/2 -translate-y-1/2 font-bold text-emerald-400";
+        } else {
+            diffInput.className = baseClasses + "border-cyan-900/50 text-cyan-400";
+            diffIcon.className = "absolute left-3 top-1/2 -translate-y-1/2 font-bold text-cyan-400";
+        }
+    }
 
     validarCierreCaja(totalEsperado);
 }

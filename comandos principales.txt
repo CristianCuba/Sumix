@@ -11,7 +11,7 @@ git add .
 2. Guardar el estado local con un mensaje claro
 Bash
 
-git commit -m "transferencias actualizadas y arte de deudas"
+git commit -m "modulo de compras actualizado y vista valance creado y actualizado funcionando a full"
 
 3. Subir las actualizaciones a GitHub
 Bash

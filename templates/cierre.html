@@ -17,7 +17,7 @@
         <div class="flex flex-wrap items-center gap-3">
             <!-- Acceso a la vista dedicada de Deudas -->
             <a href="{{ url_for('vista_deudas') }}" 
-               class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 font-bold rounded-xl transition text-xs flex items-center gap-2 shadow-lg">
+              target="_blank" class="px-4 py-2 bg-rose-600/20 hover:bg-rose-600 text-rose-400 hover:text-white border border-rose-500/30 font-bold rounded-xl transition text-xs flex items-center gap-2 shadow-lg">
                 <span>📋 Gestionar Deudas / Fiados</span>
             </a>
 
@@ -106,7 +106,9 @@
 
     <!-- Barra Inferior de Cierre -->
     <footer class="p-6 bg-[#1a1b1e] border-t border-gray-800 flex flex-col xl:flex-row items-center justify-between gap-6 shrink-0">
-        <div class="flex flex-col sm:flex-row items-center gap-6 w-full xl:w-auto justify-between xl:justify-start">
+        <div class="flex flex-wrap items-center gap-6 w-full xl:w-auto justify-between xl:justify-start">
+            
+            <!-- Total Esperado en Caja -->
             <div>
                 <span class="text-xs uppercase font-semibold text-gray-400 tracking-wider block">Total Esperado en Caja</span>
                 <span id="total-esperado" class="text-3xl font-extrabold text-white font-mono tracking-tight">$0.00</span>
@@ -114,6 +116,7 @@
 
             <div class="h-10 w-px bg-gray-800 hidden sm:block"></div>
 
+            <!-- Deducciones calculadas (RESTAURADO) -->
             <div class="bg-[#121316] border border-gray-800 rounded-xl p-3 text-xs space-y-1 w-full sm:w-64">
                 <span class="font-semibold text-orange-400 block mb-1">Deducciones calculadas:</span>
                 <div class="flex justify-between text-gray-300">
@@ -126,25 +129,53 @@
                 </div>
             </div>
 
-            <div class="h-10 w-px bg-gray-800 hidden sm:block"></div>
+            <div class="h-10 w-px bg-gray-800 hidden md:block"></div>
 
+            <!-- Deudas del Día (NUEVO) -->
+            <div class="flex items-center gap-3">
+                <label for="deudas-dia" class="text-xs uppercase font-semibold text-rose-400 tracking-wider block">Deudas del Día:</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-rose-400 font-bold">$</span>
+                    <input type="number" id="deudas-dia" step="any"
+                        class="w-28 bg-[#121316] border border-rose-900/50 rounded-xl pl-7 pr-3 py-2.5 text-lg font-bold text-rose-400 font-mono focus:outline-none cursor-not-allowed"
+                        value="{{ total_deudas_dia | default(0) }}" readonly>
+                </div>
+            </div>
+
+            <div class="h-10 w-px bg-gray-800 hidden lg:block"></div>
+
+            <!-- Efectivo en Caja -->
             <div class="flex items-center gap-3">
                 <label for="dinero-caja" class="text-xs uppercase font-semibold text-gray-400 tracking-wider block">Efectivo en Caja:</label>
                 <div class="relative">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                    <input type="number" id="dinero-caja" step="any" min="0"
+                    <input type="number" id="dinero-caja" step="any" min="0" oninput="calcular()"
                         class="w-36 bg-[#121316] border border-gray-700 rounded-xl pl-7 pr-3 py-2.5 text-lg font-bold text-white font-mono focus:border-orange-500 focus:outline-none"
-                        placeholder="0.00" oninput="calcular()">
+                        placeholder="0.00">
                 </div>
             </div>
 
+            <!-- Transferencias -->
             <div class="flex items-center gap-3">
                 <label for="dinero-transferencia" class="text-xs uppercase font-semibold text-gray-400 tracking-wider block">Transferencias:</label>
                 <div class="relative">
                     <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
-                    <input type="number" id="dinero-transferencia" step="any" min="0"
+                    <input type="number" id="dinero-transferencia" step="any" min="0" oninput="calcular()"
                         class="w-36 bg-[#121316] border border-gray-700 rounded-xl pl-7 pr-3 py-2.5 text-lg font-bold text-white font-mono focus:border-orange-500 focus:outline-none"
-                        placeholder="0.00" oninput="calcular()">
+                        placeholder="0.00">
+                </div>
+            </div>
+
+            <div class="h-10 w-px bg-gray-800 hidden xl:block"></div>
+
+            <!-- Diferencia (NUEVO) -->
+            <div class="flex items-center gap-3">
+                <label for="diferencia-caja" class="text-xs uppercase font-semibold text-cyan-400 tracking-wider block">Diferencia:</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-1/2 -translate-y-1/2 text-cyan-400 font-bold" id="icono-diferencia">$</span>
+                    <input type="number" id="diferencia-caja" step="any"
+                        class="w-28 bg-[#121316] border border-cyan-900/50 rounded-xl pl-7 pr-3 py-2.5 text-lg font-bold text-cyan-400 font-mono focus:outline-none cursor-not-allowed"
+                        placeholder="0.00" readonly>
                 </div>
             </div>
         </div>

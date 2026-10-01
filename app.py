@@ -212,6 +212,7 @@ class DeudaCierre(db.Model):
     cantidad = db.Column(db.Float, default=1.0)
     subtotal = db.Column(db.Float, default=0.0)
     estado = db.Column(db.String(20), default='pendiente')
+    fecha = db.Column(db.DateTime, default=datetime.now)
 
 
 class DetalleCierre(db.Model):
@@ -605,6 +606,9 @@ def guardar_deuda():
     concepto = request.form.get('concepto', '').strip()
     producto_id = request.form.get('producto_id', type=int)
     cantidad = request.form.get('cantidad', type=float, default=1.0)
+    
+    # NUEVO: Capturar la fecha que viene del formulario
+    fecha_recibida = request.form.get('fecha')
 
     if not concepto or cantidad <= 0:
         flash("Ingresa un concepto/deudor válido.", "danger")
@@ -619,13 +623,20 @@ def guardar_deuda():
             prod_nombre = prod.nombre
             subtotal = cantidad * prod.precio_venta
 
+    # NUEVO: Convertir la fecha de texto a objeto datetime
+    if fecha_recibida:
+        fecha_obj = datetime.strptime(fecha_recibida, '%Y-%m-%d')
+    else:
+        fecha_obj = datetime.now()
+
     nueva_deuda = DeudaCierre(
         concepto=concepto,
         producto_id=producto_id if producto_id else 0,
         producto_nombre=prod_nombre,
         cantidad=cantidad,
         subtotal=subtotal,
-        estado='pendiente'
+        estado='pendiente',
+        fecha=fecha_obj  # NUEVO: Guardar la fecha en la base de datos
     )
 
     db.session.add(nueva_deuda)
@@ -894,8 +905,12 @@ def eliminar_proveedor(id):
     db.session.commit()
     return redirect(url_for('vista_gestion_entidades'))
 
+from datetime import date
+from sqlalchemy import func
+
 @app.route('/cierre')
 def vista_cierre():
+    # 1. Validación del usuario y obtención de su almacén
     username = session.get('user')
     usuario_actual = Usuario.query.filter_by(username=username).first()
     
@@ -903,6 +918,8 @@ def vista_cierre():
         return redirect(url_for('login'))
 
     almacen_id = usuario_actual.almacen_id
+    
+    # 2. Carga de productos y su stock actual en el almacén del usuario
     productos = Producto.query.all()
     
     for prod in productos:
@@ -916,7 +933,17 @@ def vista_cierre():
         prod.stock_en_almacen = cantidad_actual
         prod.stock_final_inicial = cantidad_actual
 
-    return render_template('cierre.html', productos=productos)
+    # 3. Cálculo de deudas pendientes exclusivas de HOY
+    hoy = date.today()
+    deudas_pendientes = DeudaCierre.query.filter(
+        DeudaCierre.estado == 'pendiente',
+        func.date(DeudaCierre.fecha) == hoy
+    ).all()
+    
+    total_deudas_dia = sum(d.subtotal for d in deudas_pendientes if d.subtotal)
+
+    # 4. Renderizar la plantilla enviando los productos y el total de deudas
+    return render_template('cierre.html', productos=productos, total_deudas_dia=total_deudas_dia)
 
 import json
 

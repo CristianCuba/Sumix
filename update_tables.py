@@ -1,10 +1,17 @@
-from app import app, db
+from app import app, db, DeudaCierre
+from datetime import datetime, timedelta
 
 with app.app_context():
-    try:
-        # Añadir la columna cierre_id a la tabla deudas_cierre
-        db.session.execute(db.text('ALTER TABLE deudas_cierre ADD COLUMN cierre_id INTEGER;'))
+    # Calcular la fecha y hora de ayer
+    ayer = datetime.now() - timedelta(days=1)
+    
+    # Buscar el registro específico por su ID
+    deuda = DeudaCierre.query.get(10)
+    
+    if deuda:
+        # Actualizar la fecha y guardar los cambios
+        deuda.fecha = ayer
         db.session.commit()
-        print("¡Columna 'cierre_id' agregada exitosamente a la tabla 'deudas_cierre'!")
-    except Exception as e:
-        print(f"Ocurrió un error (es posible que la columna ya exista): {e}")
+        print(f"✅ Éxito: La fecha de la deuda con ID 10 se cambió a {ayer.strftime('%Y-%m-%d %H:%M:%S')}")
+    else:
+        print("⚠️ Error: No se encontró ninguna deuda con el ID 10 en la base de datos.")
