@@ -37,7 +37,20 @@ class PrestamoTercero(db.Model):
     estado = db.Column(db.String(20), default='PENDIENTE')
 
     propietario = db.relationship('Propietario', backref=db.backref('prestamos', lazy=True))
+class CuentaPorPagar(db.Model):
+    __tablename__ = 'cuentas_por_pagar'
+    id = db.Column(db.Integer, primary_key=True)
+    proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedores.id'))  # Revisa el nombre de tu tabla de proveedores
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'))      # Revisa el nombre de tu tabla de productos
+    cantidad = db.Column(db.Integer, default=1)
+    monto_total = db.Column(db.Float, nullable=False)
+    monto_pendiente = db.Column(db.Float, nullable=False)
+    fecha = db.Column(db.DateTime, default=datetime.utcnow)
+    estado = db.Column(db.String(20), default='pendiente')
 
+    # AGREGA ESTAS DOS LÍNEAS AL FINAL DEL MODELO:
+    proveedor = db.relationship('Proveedor', backref='cuentas_por_pagar')
+    producto = db.relationship('Producto', backref='cuentas_por_pagar')
 
 class MovimientoCapital(db.Model):
     """Inyecciones o Retiros de dinero realizados por los propietarios."""
@@ -81,6 +94,7 @@ class Compra(db.Model):
     metodo_pago = db.Column(db.String(20), default='EFECTIVO')
 
     items = db.relationship('ItemCompra', backref='compra', lazy=True)
+    propietario = db.relationship('Propietario', backref='compras')
 
 class ItemCompra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -200,6 +214,7 @@ class CierreDia(db.Model):
     diferencia = db.Column(db.Float, default=0.0)
     detalles = db.relationship('DetalleCierre', backref='cierre', lazy=True)
     deudas = db.relationship('DeudaCierre', backref='cierre', lazy=True) # <--- Relación con las deudas del cierre
+    usuario = db.relationship('Usuario', backref='cierres_dia')
 
 
 class DeudaCierre(db.Model):
@@ -213,6 +228,7 @@ class DeudaCierre(db.Model):
     subtotal = db.Column(db.Float, default=0.0)
     estado = db.Column(db.String(20), default='pendiente')
     fecha = db.Column(db.DateTime, default=datetime.now)
+    producto = db.relationship('Producto', backref='deudas_cierre')
 
 
 class DetalleCierre(db.Model):
@@ -228,6 +244,7 @@ class DetalleCierre(db.Model):
     stock_final = db.Column(db.Float, default=0.0)
     vendidos = db.Column(db.Float, default=0.0)
     subtotal = db.Column(db.Float, default=0.0)
+    producto = db.relationship('Producto', backref='detalles_cierre')
 
 class TipoOperacion(db.Model):
     __tablename__ = 'tipos_operacion'
@@ -1109,60 +1126,71 @@ def trasladar_stock():
     return redirect(url_for('vista_admin'))
 from datetime import datetime
 
+from datetime import datetime
+
 @app.route('/guardar_producto', methods=['POST'])
 def guardar_producto():
-    # 1. Obtener datos del formulario
-    nombre = request.form.get('nombre')
-    precio_costo = float(request.form.get('precio_costo', 0))
-    precio_venta = float(request.form.get('precio_venta', 0))
-    proveedor_id = request.form.get('proveedor_id')  # ID del select de proveedores
-    almacen_id = request.form.get('almacen_id')      # ID del select de almacenes
-    cantidad_inicial = float(request.form.get('cantidad', 0))
-    
-    # --- CAPTURAR Y PARSEAR FECHA DE VENCIMIENTO ---
-    fecha_venc_str = request.form.get('fecha_vencimiento')
-    fecha_vencimiento = None
-    if fecha_venc_str:
-        try:
-            fecha_vencimiento = datetime.strptime(fecha_venc_str, '%Y-%m-%d').date()
-        except ValueError:
-            fecha_vencimiento = None
+    try:
+        # 1. Obtener y limpiar los datos enviados desde el Modal HTML
+        nombre = request.form.get('nombre')
+        almacen_id = request.form.get('almacen_id', type=int)
+        cantidad = float(request.form.get('cantidad', 0))
+        unidad_medida = request.form.get('unidad_medida', 'u')
+        precio_costo = float(request.form.get('precio_costo', 0))
+        precio_venta = float(request.form.get('precio_venta', 0))
+        estado_pago = request.form.get('estado_pago')  # 'Pagado' o 'Pendiente'
+        
+        # Parseo seguro de relaciones opcionales (IDs)
+        proveedor_id = int(request.form.get('proveedor_id')) if request.form.get('proveedor_id') else None
+        propietario_id = int(request.form.get('propietario_id')) if request.form.get('propietario_id') else None
+        
+        # Parseo de fecha de vencimiento
+        fecha_venc_raw = request.form.get('fecha_vencimiento')
+        fecha_vencimiento = datetime.strptime(fecha_venc_raw, '%Y-%m-%d').date() if fecha_venc_raw else None
 
-    # CAPTURAR EL ESTADO DE PAGO DESDE EL FORMULARIO
-    estado_pago = request.form.get('estado_pago', 'Pagado') 
-    propietario_id = request.form.get("propietario_id")
-
-    # Si viene como cadena vacía o no existe, puedes definir un valor por defecto o lanzar error
-    id_final = int(propietario_id) if propietario_id and propietario_id.isdigit() else None
-    # Calcular monto pendiente
-    monto_pendiente = 0.0
-    if estado_pago == 'Pendiente':
-        monto_pendiente = precio_costo * cantidad_inicial
-
-    # 2. Crear el Producto con todos los campos
-    nuevo_producto = Producto(
-        nombre=nombre,
-        precio_costo=precio_costo,
-        precio_venta=precio_venta,
-        proveedor_id=int(proveedor_id) if proveedor_id else None,
-        estado_pago=estado_pago,             
-        monto_pendiente=monto_pendiente,
-        fecha_vencimiento=fecha_vencimiento,
-        propietario_id=id_final
-    )
-    db.session.add(nuevo_producto)
-    db.session.flush()  # Para obtener el ID generado del nuevo_producto
-
-    # 3. Crear el registro en StockAlmacen
-    if almacen_id:
-        nuevo_stock = StockAlmacen(
-            producto_id=nuevo_producto.id,
-            almacen_id=int(almacen_id),
-            cantidad=cantidad_inicial
+        # 2. Crear el registro del Producto
+        nuevo_producto = Producto(
+            nombre=nombre,
+            unidad_medida=unidad_medida,
+            precio_costo=precio_costo,
+            precio_venta=precio_venta,
+            proveedor_id=proveedor_id,
+            propietario_id=propietario_id,
+            fecha_vencimiento=fecha_vencimiento
         )
-        db.session.add(nuevo_stock)
+        db.session.add(nuevo_producto)
+        db.session.flush()  # Genera el ID de nuevo_producto sin cerrar la transacción
 
-    db.session.commit()
+        # 3. Asignar el stock inicial al Almacén seleccionado
+        if almacen_id and cantidad > 0:
+            nuevo_stock = StockAlmacen(
+                almacen_id=almacen_id,
+                producto_id=nuevo_producto.id,
+                cantidad=cantidad
+            )
+            db.session.add(nuevo_stock)
+
+        # 4. Generar la Cuenta por Pagar SI EL PAGO ES PENDIENTE
+        if estado_pago == 'Pendiente' and proveedor_id:
+            monto_deuda = precio_costo * cantidad
+            
+            nueva_cuenta = CuentaPorPagar(
+                proveedor_id=proveedor_id,
+                producto_id=nuevo_producto.id,
+                monto_total=monto_deuda,
+                monto_pendiente=monto_deuda,
+                fecha=datetime.now(),
+                estado='pendiente'
+            )
+            db.session.add(nueva_cuenta)
+
+        db.session.commit()
+        flash("Producto registrado con éxito y cuenta por pagar asociada.", "success")
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al registrar el producto: {str(e)}", "danger")
+
     return redirect(url_for('vista_admin'))
 
 @app.route('/eliminar_producto/<int:id>', methods=['POST'])
@@ -1337,16 +1365,135 @@ def editar_producto(id):
 # CONSULTA DE CIERRES Y REPORTES (ADMIN)
 # -----------------------------------------------------------------#
 
+from datetime import datetime
+from flask import request
+
+from datetime import datetime
+from flask import request, session, redirect, url_for, render_template
+
 @app.route('/admin/cierres')
 def vista_reporte_cierres():
-    """Vista con la tabla e historial de cierres de caja realizados."""
     if 'user' not in session or session.get('rol') != 'admin':
         return redirect(url_for('login'))
 
-    # Obtener cierres ordenados del más reciente al más antiguo
-    cierres = CierreDia.query.order_by(CierreDia.fecha.desc()).all()
-    return render_template('admin_cierres.html', cierres=cierres)
+    fecha_inicio_str = request.args.get('fecha_inicio')
+    fecha_fin_str = request.args.get('fecha_fin')
+    propietario_id = request.args.get('propietario_id')
+    proveedor_id = request.args.get('proveedor_id')
 
+    query = CierreDia.query
+
+    # 1. Filtro en Base de Datos (JOINs)
+    if propietario_id or proveedor_id:
+        query = query.join(DetalleCierre).join(Producto)
+        
+        if propietario_id:
+            query = query.filter(Producto.propietario_id == propietario_id)
+        if proveedor_id:
+            query = query.filter(Producto.proveedor_id == proveedor_id)
+
+    # 2. Filtro de Fechas
+    if fecha_inicio_str and fecha_fin_str:
+        fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
+        fecha_fin = datetime.strptime(fecha_fin_str + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
+        query = query.filter(CierreDia.fecha >= fecha_inicio, CierreDia.fecha <= fecha_fin)
+
+    cierres = query.distinct().order_by(CierreDia.fecha.desc()).all()
+
+    # 3. Construcción del Resumen
+    resumen = {
+        'total_esperado': 0,
+        'total_transferencias': 0,
+        'efectivo_caja': 0,
+        'total_deudas': 0, 
+        'diferencia': 0,
+        'subtotal_filtrado': 0, 
+        'costo_filtrado': 0,
+        'ganancia_filtrada': 0,
+        'productos': {} 
+    }
+
+    for c in cierres:
+        resumen['total_esperado'] += c.total_esperado
+        resumen['total_transferencias'] += c.total_transferencias
+        resumen['efectivo_caja'] += c.efectivo_caja
+        resumen['total_deudas'] += c.total_deudas
+        resumen['diferencia'] += c.diferencia
+
+        for d in c.detalles:
+            if not d.producto:
+                continue
+                
+            if propietario_id and str(d.producto.propietario_id) != str(propietario_id):
+                continue
+            if proveedor_id and str(d.producto.proveedor_id) != str(proveedor_id):
+                continue
+
+            precio_costo_unitario = d.producto.precio_costo or 0.0
+            precio_venta_unitario = getattr(d.producto, 'precio', 0.0)
+            
+            costo_total_item = d.vendidos * precio_costo_unitario
+            ganancia_item = d.subtotal - costo_total_item
+
+            nombre = d.nombre_producto
+            if nombre not in resumen['productos']:
+                resumen['productos'][nombre] = {
+                    'vendidos': 0, 
+                    'subtotal': 0.0,
+                    'costo': 0.0,
+                    'ganancia': 0.0,
+                    'precio_costo': precio_costo_unitario, # <--- NUEVO: Precio Costo Unitario
+                    'precio_venta': precio_venta_unitario   # <--- NUEVO: Precio Venta Unitario
+                }
+            
+            resumen['productos'][nombre]['vendidos'] += d.vendidos
+            resumen['productos'][nombre]['subtotal'] += d.subtotal
+            resumen['productos'][nombre]['costo'] += costo_total_item
+            resumen['productos'][nombre]['ganancia'] += ganancia_item
+
+            resumen['subtotal_filtrado'] += d.subtotal
+            resumen['costo_filtrado'] += costo_total_item
+            resumen['ganancia_filtrada'] += ganancia_item
+
+    propietarios_list = Propietario.query.all()
+    proveedores_list = Proveedor.query.all()
+
+    proveedor_seleccionado = None
+    whatsapp_url = ""
+    
+    if proveedor_id:
+        proveedor_seleccionado = Proveedor.query.get(proveedor_id)
+        
+        if proveedor_seleccionado:
+            lineas_msg = [f"Hola *{proveedor_seleccionado.nombre}*, este es el reporte de los productos vendidos:"]
+            lineas_msg.append("-----------------------------")
+            
+            for nombre, datos in resumen['productos'].items():
+                if datos['vendidos'] > 0:
+                    # Incluye precio unitario de costo en el mensaje de WhatsApp
+                    lineas_msg.append(f"▪ {nombre}: {datos['vendidos']} uds x ${datos['precio_costo']:,.2f} = ${datos['costo']:,.2f}")
+            
+            lineas_msg.append("-----------------------------")
+            lineas_msg.append(f"*TOTAL A PAGAR:* ${resumen['costo_filtrado']:,.2f}")
+            
+            texto_codificado = urllib.parse.quote("\n".join(lineas_msg))
+            telefono = (proveedor_seleccionado.telefono or "").replace(" ", "").replace("+", "")
+            
+            if telefono:
+                whatsapp_url = f"https://wa.me/{telefono}?text={texto_codificado}"
+            else:
+                whatsapp_url = f"https://api.whatsapp.com/send?text={texto_codificado}"
+    
+    return render_template('admin_cierres.html', 
+                           cierres=cierres, 
+                           resumen=resumen,
+                           fecha_inicio=fecha_inicio_str, 
+                           fecha_fin=fecha_fin_str,
+                           propietario_id=propietario_id,
+                           proveedor_id=proveedor_id,
+                           propietarios=propietarios_list,
+                           proveedores=proveedores_list,
+                           whatsapp_url=whatsapp_url)
 
 @app.route('/admin/cierres/<int:id_cierre>/detalle')
 def obtener_detalle_cierre(id_cierre):
@@ -1442,51 +1589,101 @@ def obtener_detalle_cierre(id_cierre):
 import urllib.parse
 
 @app.route('/admin/cuentas-por-pagar')
-@app.route('/cuentas-por-pagar')
+@app.route('/admin/cuentas-por-pagar')
 def cuentas_por_pagar():
     if 'user' not in session or session.get('rol') != 'admin':
         return redirect(url_for('login'))
 
-    proveedor_filtro = request.args.get('proveedor', '')
+    proveedor_id = request.args.get('proveedor')
 
-    todos_los_proveedores = Proveedor.query.all()
-    query = Producto.query.filter_by(estado_pago='Pendiente')
+    # 1. Filtro principal: SOLO cuentas con saldo pendiente > 0 y estado distinto de 'pagado'
+    query = CuentaPorPagar.query.filter(
+        CuentaPorPagar.monto_pendiente > 0,
+        CuentaPorPagar.estado != 'pagado'
+    )
 
-    proveedor_obj = None
-    if proveedor_filtro and proveedor_filtro.isdigit():
-        query = query.filter_by(proveedor_id=int(proveedor_filtro))
-        proveedor_obj = Proveedor.query.get(int(proveedor_filtro))
+    # 2. Si el usuario selecciona un proveedor en el filtro
+    if proveedor_id:
+        query = query.filter(CuentaPorPagar.proveedor_id == proveedor_id)
 
-    cuentas_pendientes = query.all()
-    total_adeudado = sum(item.monto_pendiente for item in cuentas_pendientes if item.monto_pendiente)
+    cuentas = query.all()
 
-    # Cargar los últimos 20 pagos del historial
-    historial = HistorialPago.query.order_by(HistorialPago.fecha_pago.desc()).limit(20).all()
+    # Calcular monto total pendiente
+    total_adeudado = sum(c.monto_pendiente for c in cuentas)
 
-    # Generar el mensaje de WhatsApp si hay un proveedor seleccionado
+    # Cargar lista de proveedores para el selector desplegable
+    proveedores = Proveedor.query.all()
+
+    # Cargar historial de pagos realizados (para la tabla de abajo)
+    historial = HistorialPago.query.order_by(HistorialPago.fecha_pago.desc()).all()
+
+    # Datos adicionales para resumen de WhatsApp
+    proveedor_obj = Proveedor.query.get(proveedor_id) if proveedor_id else None
     mensaje_wa = ""
-    if proveedor_obj and cuentas_pendientes:
-        lineas = [f"*RESUMEN DE CUENTA PENDIENTE*", f"*Proveedor:* {proveedor_obj.nombre}\n"]
-        for p in cuentas_pendientes:
-            cant = p.cantidad_total or 0
-            lineas.append(f"• {p.nombre} ({cant} unid.) -> *${'%.2f' % p.monto_pendiente}*")
+    if proveedor_obj:
+        detalles = []
+        for c in cuentas:
+            prod = Producto.query.get(c.producto_id) if c.producto_id else None
+            nombre_prod = prod.nombre if prod else "Producto/Servicio"
+            detalles.append(f"- {nombre_prod} (Cant: {c.cantidad}): ${c.monto_pendiente:.2f}")
         
-        lineas.append(f"\n*TOTAL ADEUDADO:* *${'%.2f' % total_adeudado}*")
-        lineas.append(" Quedo al pendiente para realizar el pago. ¡Gracias!")
-        
-        texto_completo = "\n".join(lineas)
-        mensaje_wa = urllib.parse.quote(texto_completo)
+        texto_detalles = "%0A".join(detalles)
+        mensaje_wa = f"Hola {proveedor_obj.nombre}, te adjunto el resumen de cuentas pendientes:%0A%0A{texto_detalles}%0A%0ATotal pendiente: ${total_adeudado:.2f}"
 
     return render_template(
         'cuentas_por_pagar.html',
-        cuentas=cuentas_pendientes,
-        proveedores=todos_los_proveedores,
-        proveedor_seleccionado=str(proveedor_filtro),
-        proveedor_obj=proveedor_obj,
+        cuentas=cuentas,
         total_adeudado=total_adeudado,
-        historial=historial,
-        mensaje_wa=mensaje_wa
+        proveedores=proveedores,
+        proveedor_seleccionado=proveedor_id,
+        proveedor_obj=proveedor_obj,
+        mensaje_wa=mensaje_wa,
+        historial=historial
     )
+
+@app.route('/admin/pagar-cuenta/<int:id>', methods=['POST'])
+def pagar_cuenta_proveedor(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+        
+    cuenta = CuentaPorPagar.query.get_or_404(id)
+    
+    try:
+        cantidad_a_pagar = int(request.form.get('cantidad_a_pagar', 1))
+    except (TypeError, ValueError):
+        cantidad_a_pagar = 1
+
+    if cantidad_a_pagar <= 0:
+        return redirect(url_for('cuentas_por_pagar'))
+        
+    # Limita a no abonar más unidades de las que quedan registradas
+    cantidad_a_pagar = min(cantidad_a_pagar, cuenta.cantidad)
+
+    # Calcular precio unitario original congelado de esta deuda
+    precio_unitario = cuenta.monto_pendiente / cuenta.cantidad if cuenta.cantidad > 0 else 0
+    monto_a_pagar = precio_unitario * cantidad_a_pagar
+
+    # Registrar abono en el Historial
+    nombre_prod = cuenta.producto.nombre if cuenta.producto else "Producto General"
+    pago = HistorialPago(
+        proveedor_nombre=cuenta.proveedor.nombre if cuenta.proveedor else "Sin Proveedor",
+        producto_nombre=f"{nombre_prod} (x{cantidad_a_pagar})",
+        monto_pagado=monto_a_pagar
+    )
+    db.session.add(pago)
+
+    # Descontar tanto las unidades como el dinero adeudado
+    cuenta.cantidad -= cantidad_a_pagar
+    cuenta.monto_pendiente -= monto_a_pagar
+
+    # Marcar como totalmente pagado si ya no restan unidades o saldo
+    if cuenta.cantidad <= 0 or cuenta.monto_pendiente <= 0:
+        cuenta.cantidad = 0
+        cuenta.monto_pendiente = 0
+        cuenta.estado = 'pagado'
+
+    db.session.commit()
+    return redirect(url_for('cuentas_por_pagar'))
 
 # -----------------------------------------------------------------#
 # GESTIÓN DE USUARIOS

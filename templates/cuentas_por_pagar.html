@@ -57,10 +57,22 @@
 
     <!-- Tabla Cuentas Pendientes -->
     <div class="space-y-3">
-        <h3 class="text-lg font-bold text-white">Deudas Pendientes</h3>
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white">Deudas Pendientes</h3>
+            
+            <!-- Botón Copiar Tabla Deudas Pendientes -->
+            <button onclick="copiarTabla('tabla-deudas-pendientes', this)" type="button"
+                class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-semibold transition border border-gray-700 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span class="btn-texto">Copiar Tabla</span>
+            </button>
+        </div>
+
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
+                <table id="tabla-deudas-pendientes" class="w-full text-left border-collapse text-sm">
                     <thead>
                         <tr class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                             <th class="p-4">Fecha</th>
@@ -68,16 +80,27 @@
                             <th class="p-4">Proveedor</th>
                             <th class="p-4 text-center">Cantidad</th>
                             <th class="p-4 text-right">Pendiente</th>
-                            <th class="p-4 text-center">Acción</th>
+                            <th class="p-4 text-center no-copiar">Acción</th> <!-- no-copiar evita pegar los botones -->
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-800/60 text-gray-300">
                         {% for item in cuentas %}
                         <tr class="hover:bg-gray-800/30 transition-colors">
+                            <!-- FECHA -->
                             <td class="p-4 font-mono text-xs text-gray-400">
-                                {{ item.fecha_creacion.strftime('%Y-%m-%d') if item.fecha_creacion else 'N/A' }}
+                                {% if item.fecha %}
+                                    {{ item.fecha.strftime('%Y-%m-%d') if item.fecha.strftime else item.fecha }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
                             </td>
-                            <td class="p-4 font-semibold text-white">{{ item.nombre }}</td>
+
+                            <!-- PRODUCTO -->
+                            <td class="p-4 font-semibold text-white">
+                                {{ item.producto.nombre if item.producto else 'Producto/Servicio' }}
+                            </td>
+
+                            <!-- PROVEEDOR -->
                             <td class="p-4">
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
                                     {% if item.proveedor %}
@@ -87,19 +110,30 @@
                                     {% endif %}
                                 </span>
                             </td>
-                            <td class="p-4 text-center font-mono">{{ item.cantidad_total or 0 }}</td>
+
+                            <!-- CANTIDAD ESTIMADA -->
+                            <td class="p-4 text-center font-mono">
+                                {{ item.cantidad }}
+                            </td>
+
+                            <!-- MONTO PENDIENTE -->
                             <td class="p-4 text-right font-mono font-bold text-amber-400">
                                 ${{ "%.2f"|format(item.monto_pendiente or 0.0) }}
                             </td>
-                            <td class="p-4 text-center">
-                                <form method="POST" action="{{ url_for('pagar_cuenta', id=item.id) }}">
+
+                            <!-- ACCIÓN -->
+                            <td class="p-4 text-center no-copiar">
+                                <form method="POST" 
+                                    action="{{ url_for('pagar_cuenta_proveedor', id=item.id) }}" 
+                                    onsubmit="return solicitarCantidad(this, {{ item.cantidad }})">
+                                    <input type="hidden" name="cantidad_a_pagar" value="1">
                                     <button type="submit"
                                         class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 rounded-xl text-xs font-semibold transition-all shadow-md">
                                         Marcar Pagado
                                     </button>
                                 </form>
                             </td>
-                        </tr>
+                        </tr>   
                         {% else %}
                         <tr>
                             <td colspan="6" class="p-8 text-center text-gray-500 font-medium">
@@ -115,12 +149,24 @@
 
     <!-- Tabla Historial de Pagos Realizados -->
     <div class="space-y-3 pt-4">
-        <h3 class="text-lg font-bold text-white flex items-center gap-2">
-            <span>Historial de Pagos Realizados</span>
-        </h3>
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2">
+                <span>Historial de Pagos Realizados</span>
+            </h3>
+
+            <!-- Botón Copiar Tabla Historial -->
+            <button onclick="copiarTabla('tabla-historial-pagos', this)" type="button"
+                class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-white rounded-xl text-xs font-semibold transition border border-gray-700 shadow-md">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <span class="btn-texto">Copiar Tabla</span>
+            </button>
+        </div>
+
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-sm">
+                <table id="tabla-historial-pagos" class="w-full text-left border-collapse text-sm">
                     <thead>
                         <tr class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
                             <th class="p-4">Fecha de Pago</th>
@@ -155,4 +201,75 @@
     </div>
 
 </div>
+
+<!-- Script para copiar la tabla al portapapeles -->
+<script>
+function copiarTabla(idTabla, boton) {
+    const tabla = document.getElementById(idTabla);
+    if (!tabla) return;
+
+    let contenido = '';
+    const filas = tabla.querySelectorAll('tr');
+
+    filas.forEach(fila => {
+        const celdas = fila.querySelectorAll('th, td');
+        const filaDatos = Array.from(celdas)
+            // Filtra los elementos marcados con la clase 'no-copiar'
+            .filter(celda => !celda.classList.contains('no-copiar'))
+            .map(celda => celda.innerText.trim().replace(/\s+/g, ' '));
+        
+        if (filaDatos.length > 0) {
+            contenido += filaDatos.join('\t') + '\n';
+        }
+    });
+
+    navigator.clipboard.writeText(contenido).then(() => {
+        if (boton) {
+            const spanTexto = boton.querySelector('.btn-texto');
+            const textoOriginal = spanTexto ? spanTexto.innerText : 'Copiar Tabla';
+            
+            if (spanTexto) spanTexto.innerText = '¡Copiado!';
+            boton.classList.add('bg-emerald-600', 'border-emerald-500');
+
+            setTimeout(() => {
+                if (spanTexto) spanTexto.innerText = textoOriginal;
+                boton.classList.remove('bg-emerald-600', 'border-emerald-500');
+            }, 2000);
+        }
+    }).catch(err => {
+        console.error('Error al copiar la tabla: ', err);
+        alert('Ocurrió un error al intentar copiar la tabla.');
+    });
+}
+function solicitarCantidad(form, cantidadDisponible) {
+    // Si solo hay 1 unidad, procesa directamente sin preguntar
+    if (cantidadDisponible <= 1) {
+        form.querySelector('input[name="cantidad_a_pagar"]').value = 1;
+        return true;
+    }
+
+    // Si hay más de 1 unidad, pregunta cuántas va a liquidar
+    let respuesta = prompt(`Cantidad pendiente: ${cantidadDisponible}\n¿Cuántas unidades deseas liquidar?`, cantidadDisponible);
+    
+    // Si cancela la ventana emergente, detiene el envío
+    if (respuesta === null) return false;
+
+    let cantidadALiquidar = parseInt(respuesta);
+
+    // Validaciones
+    if (isNaN(cantidadALiquidar) || cantidadALiquidar <= 0) {
+        alert("Por favor ingresa un número válido mayor a 0.");
+        return false;
+    }
+
+    if (cantidadALiquidar > cantidadDisponible) {
+        alert(`No puedes liquidar más de las unidades pendientes (${cantidadDisponible}).`);
+        return false;
+    }
+
+    // Asigna la cantidad al campo oculto del formulario
+    form.querySelector('input[name="cantidad_a_pagar"]').value = cantidadALiquidar;
+    return true;
+}
+</script>
 {% endblock %}

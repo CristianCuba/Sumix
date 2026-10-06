@@ -1,17 +1,25 @@
-from app import app, db, DeudaCierre
-from datetime import datetime, timedelta
+from app import app, db, CuentaPorPagar, Producto
 
 with app.app_context():
-    # Calcular la fecha y hora de ayer
-    ayer = datetime.now() - timedelta(days=1)
+    # Buscamos todos los productos que tienen estado 'Pagado' o 'pagado'
+    productos_pagados = Producto.query.filter(
+        db.func.lower(Producto.estado_pago) == 'pagado'
+    ).all()
     
-    # Buscar el registro específico por su ID
-    deuda = DeudaCierre.query.get(10)
+    ids_pagados = [p.id for p in productos_pagados]
     
-    if deuda:
-        # Actualizar la fecha y guardar los cambios
-        deuda.fecha = ayer
+    if ids_pagados:
+        # Buscamos las cuentas por pagar asociadas a estos productos
+        cuentas = CuentaPorPagar.query.filter(CuentaPorPagar.producto_id.in_(ids_pagados)).all()
+        
+        contador = 0
+        for cuenta in cuentas:
+            cuenta.monto_pendiente = 0.0
+            cuenta.cantidad = 0
+            cuenta.estado_pago = 'pagado'
+            contador += 1
+            
         db.session.commit()
-        print(f"✅ Éxito: La fecha de la deuda con ID 10 se cambió a {ayer.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"✅ ¡Se actualizaron {contador} deudas pendientes a estado 'PAGADO' correctamente!")
     else:
-        print("⚠️ Error: No se encontró ninguna deuda con el ID 10 en la base de datos.")
+        print("⚠️ No se encontraron productos con estado 'Pagado'.")
