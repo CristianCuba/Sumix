@@ -160,7 +160,7 @@ class Producto(db.Model):
     # Control de Caducidad
     fecha_vencimiento = db.Column(db.Date, nullable=True)
     
-    # Relación con Proveedor (Corregida para evitar choques)
+    # Relación con Proveedor
     proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedores.id'), nullable=True)
     proveedor = db.relationship('Proveedor', backref=db.backref('productos', lazy=True))
     
@@ -168,6 +168,9 @@ class Producto(db.Model):
     estado_pago = db.Column(db.String(20), default="Pagado")
     monto_pendiente = db.Column(db.Float, default=0.0)
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # --- CAMPO NUEVO PARA BORRADO LÓGICO ---
+    activo = db.Column(db.Boolean, default=True)
 
     # Relación con existencias en almacenes
     stocks = db.relationship('StockAlmacen', backref='producto', cascade="all, delete-orphan", lazy=True)
@@ -210,10 +213,11 @@ class CierreDia(db.Model):
     total_esperado = db.Column(db.Float, default=0.0)
     efectivo_caja = db.Column(db.Float, default=0.0)
     total_transferencias = db.Column(db.Float, default=0.0)
-    total_deudas = db.Column(db.Float, default=0.0) # <--- Nuevo campo para el total de deudas
+    total_deudas = db.Column(db.Float, default=0.0)
     diferencia = db.Column(db.Float, default=0.0)
+    observaciones = db.Column(db.Text, nullable=True)  # <-- NUEVO CAMPO
     detalles = db.relationship('DetalleCierre', backref='cierre', lazy=True)
-    deudas = db.relationship('DeudaCierre', backref='cierre', lazy=True) # <--- Relación con las deudas del cierre
+    deudas = db.relationship('DeudaCierre', backref='cierre', lazy=True)
     usuario = db.relationship('Usuario', backref='cierres_dia')
 
 
@@ -233,17 +237,30 @@ class DeudaCierre(db.Model):
 
 class DetalleCierre(db.Model):
     __tablename__ = 'detalles_cierre'
+    
     id = db.Column(db.Integer, primary_key=True)
     cierre_id = db.Column(db.Integer, db.ForeignKey('cierres_dia.id'), nullable=False)
-    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=False)
+    
+    # Se cambia a nullable=True para que no falle el historial si en el futuro se desactiva un producto
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
+    
     nombre_producto = db.Column(db.String(100), nullable=False)
-    propietario_nombre = db.Column(db.String(100), nullable=True) # <-- Nueva columna histórica
+    propietario_nombre = db.Column(db.String(100), nullable=True)
+    
+    # --- CAMPOS HISTÓRICOS (SNAPSHOT) ---
+    precio_costo = db.Column(db.Float, default=0.0)        # Congela el costo unitario del día de la venta
+    propietario_id = db.Column(db.Integer, nullable=True)  # Congela el ID del propietario
+    proveedor_id = db.Column(db.Integer, nullable=True)    # Congela el ID del proveedor
+    
+    # Datos de cantidades y montos del cierre
     precio_venta = db.Column(db.Float, default=0.0)
     stock_inicial = db.Column(db.Float, default=0.0)
     entradas = db.Column(db.Float, default=0.0)
     stock_final = db.Column(db.Float, default=0.0)
     vendidos = db.Column(db.Float, default=0.0)
     subtotal = db.Column(db.Float, default=0.0)
+    
+    # Relación ORM
     producto = db.relationship('Producto', backref='detalles_cierre')
 
 class TipoOperacion(db.Model):
@@ -614,6 +631,19 @@ def vista_deudas():
         total_pendiente=total_pendiente
     )
 
+@app.route('/api/deudas-dia-total', methods=['GET'])
+def api_deudas_dia_total():
+    if 'user' not in session:
+        return jsonify({'success': False, 'message': 'No autorizado'}), 401
+    
+    hoy = date.today()
+    deudas_pendientes = DeudaCierre.query.filter(
+        DeudaCierre.estado == 'pendiente',
+        func.date(DeudaCierre.fecha) == hoy
+    ).all()
+    
+    total_deudas_dia = sum(d.subtotal for d in deudas_pendientes if d.subtotal)
+    return jsonify({'success': True, 'total': total_deudas_dia})
 
 @app.route('/deudas/nueva', methods=['POST'])
 def guardar_deuda():
@@ -936,8 +966,8 @@ def vista_cierre():
 
     almacen_id = usuario_actual.almacen_id
     
-    # 2. Carga de productos y su stock actual en el almacén del usuario
-    productos = Producto.query.all()
+    # 2. Carga ÚNICAMENTE de productos activos para la caja diaria (Borrado Lógico)
+    productos = Producto.query.filter(or_(Producto.activo == True, Producto.activo.is_(None))).all()
     
     for prod in productos:
         stock_alm = StockAlmacen.query.filter_by(
@@ -950,7 +980,12 @@ def vista_cierre():
         prod.stock_en_almacen = cantidad_actual
         prod.stock_final_inicial = cantidad_actual
 
-    # 3. Cálculo de deudas pendientes exclusivas de HOY
+    # 3. ORDENAMIENTO DE PRODUCTOS:
+    # - Primero los productos con stock > 0 (ordenados alfabéticamente)
+    # - Al final los productos con stock == 0 (ordenados alfabéticamente)
+    productos.sort(key=lambda p: (p.stock_en_almacen <= 0, p.nombre.lower()))
+
+    # 4. Cálculo de deudas pendientes exclusivas de HOY
     hoy = date.today()
     deudas_pendientes = DeudaCierre.query.filter(
         DeudaCierre.estado == 'pendiente',
@@ -959,7 +994,7 @@ def vista_cierre():
     
     total_deudas_dia = sum(d.subtotal for d in deudas_pendientes if d.subtotal)
 
-    # 4. Renderizar la plantilla enviando los productos y el total de deudas
+    # 5. Renderizar la plantilla enviando los productos ordenados y el total de deudas
     return render_template('cierre.html', productos=productos, total_deudas_dia=total_deudas_dia)
 
 import json
@@ -981,7 +1016,7 @@ def vista_admin():
     
     conceptos = ConceptoMovimiento.query.all()
 
-    # 💡 Conversión limpia de conceptos a JSON para JavaScript
+    # Conversión limpia de conceptos a JSON para JavaScript
     conceptos_json = [
         {"id": c.id, "tipo_id": c.tipo_id, "nombre": c.nombre} 
         for c in conceptos
@@ -990,15 +1025,22 @@ def vista_admin():
     # 2. Captura del filtro de propietario desde la URL
     propietario_filtro_id = request.args.get("propietario_id", "todos")
 
-    # 3. Consulta de productos filtrados
+    # 3. Consulta de productos ACTIVOS únicamente (Borrado Lógico)
+    query_activos = Producto.query.filter(or_(Producto.activo == True, Producto.activo.is_(None)))
+
     if propietario_filtro_id != "todos" and propietario_filtro_id.isdigit():
-        productos = Producto.query.filter_by(
+        productos = query_activos.filter_by(
             propietario_id=int(propietario_filtro_id)
         ).all()
     else:
-        productos = Producto.query.all()
+        productos = query_activos.all()
 
-    # 4. Cálculo de métricas usando las propiedades del modelo Producto
+    # 4. ORDENAMIENTO DE PRODUCTOS EN ADMINISTRACIÓN:
+    # - Primero los productos con existencia total > 0 (ordenados alfabéticamente)
+    # - Al final los productos con existencia total == 0 (ordenados alfabéticamente)
+    productos.sort(key=lambda p: (p.cantidad_total <= 0, p.nombre.lower()))
+
+    # 5. Cálculo de métricas usando las propiedades del modelo Producto
     inversion_stock = 0.0
     valor_venta = 0.0
 
@@ -1014,7 +1056,7 @@ def vista_admin():
     ganancia_proyectada = valor_venta - inversion_stock
     efectivo_caja = session.get("efectivo_caja", 0.0)
 
-    # 5. Renderizado alineado exactamente con la plantilla Jinja2
+    # 6. Renderizado alineado exactamente con la plantilla Jinja2
     return render_template(
         "admin_almacenes.html",
         almacenes=almacenes,
@@ -1022,15 +1064,16 @@ def vista_admin():
         propietarios=propietarios,
         tipos_operacion=tipos_operacion,
         conceptos=conceptos,
-        conceptos_json=conceptos_json,  # <--- Variable JSON inyectada
+        conceptos_json=conceptos_json,
         productos=productos,
         propietario_filtro_id=str(propietario_filtro_id),
         total_invertido=inversion_stock,
-        total_venta_estimada=valor_venta,  # Nombre requerido por el HTML
-        ganancia_potencial=ganancia_proyectada,  # Nombre requerido por el HTML
+        total_venta_estimada=valor_venta,
+        ganancia_potencial=ganancia_proyectada,
         efectivo_caja=efectivo_caja,
-        hoy=date.today(),  # Para el cálculo de fecha_vencimiento en el HTML
+        hoy=date.today(),
     )
+
 @app.route('/trasladar_stock', methods=['POST'])
 def trasladar_stock():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -1195,9 +1238,16 @@ def guardar_producto():
 
 @app.route('/eliminar_producto/<int:id>', methods=['POST'])
 def eliminar_producto(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+
     producto = Producto.query.get_or_404(id)
-    db.session.delete(producto)
+    
+    # Borrado Lógico: Se marca como inactivo
+    producto.activo = False
     db.session.commit()
+
+    flash(f"El producto '{producto.nombre}' ha sido retirado del inventario activo.", "info")
     return redirect(url_for('vista_admin'))
 from flask import jsonify
 
@@ -1220,6 +1270,7 @@ def procesar_cierre():
 
     efectivo_caja = float(data.get('efectivo_caja', 0.0))
     total_transferencias = float(data.get('total_transferencias', 0.0))
+    observaciones = data.get('observaciones', '').strip()  # <--- NUEVO: Capturar observaciones
     productos_cierre = data.get('productos', [])
     deudas_cierre = data.get('deudas', [])
 
@@ -1259,7 +1310,8 @@ def procesar_cierre():
             total_transferencias=total_transferencias,
             total_deudas=total_deudas,
             total_esperado=total_esperado,
-            diferencia=diferencia
+            diferencia=diferencia,
+            observaciones=observaciones  # <--- NUEVO: Guardar observaciones en la base de datos
         )
         db.session.add(nuevo_cierre)
         db.session.flush()
@@ -1272,18 +1324,23 @@ def procesar_cierre():
             vendidos = float(p_data.get('vendidos', 0.0))
             subtotal = float(p_data.get('subtotal', 0.0))
 
-            # Dentro del loop for p_data in productos_cierre:
             producto = Producto.query.get(p_id)
             if producto:
                 stock_inicial_calculado = stock_final + vendidos - entradas
-                
                 prop_nombre = producto.propietario.nombre if producto.propietario else "Sin Propietario"
                 
+                # --- AQUÍ SE CONGELAN LOS DATOS HISTÓRICOS ---
                 detalle = DetalleCierre(
                     cierre_id=nuevo_cierre.id,
                     producto_id=producto.id,
                     nombre_producto=producto.nombre,
-                    propietario_nombre=prop_nombre, # <-- Guardamos la foto del propietario
+                    propietario_nombre=prop_nombre,
+                    
+                    # Nuevos campos del snapshot:
+                    precio_costo=producto.precio_costo or 0.0,   # Congela el costo unitario de hoy
+                    propietario_id=producto.propietario_id,     # Congela ID del socio
+                    proveedor_id=producto.proveedor_id,         # Congela ID del proveedor
+                    
                     precio_venta=producto.precio_venta,
                     stock_inicial=stock_inicial_calculado,
                     entradas=entradas,
@@ -1371,6 +1428,8 @@ from flask import request
 from datetime import datetime
 from flask import request, session, redirect, url_for, render_template
 
+from sqlalchemy import or_
+
 @app.route('/admin/cierres')
 def vista_reporte_cierres():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -1383,14 +1442,23 @@ def vista_reporte_cierres():
 
     query = CierreDia.query
 
-    # 1. Filtro en Base de Datos (JOINs)
+    # 1. Filtro en Base de Datos adaptado para soportar historial congelado
     if propietario_id or proveedor_id:
-        query = query.join(DetalleCierre).join(Producto)
-        
+        query = query.join(DetalleCierre)
         if propietario_id:
-            query = query.filter(Producto.propietario_id == propietario_id)
+            query = query.filter(
+                or_(
+                    DetalleCierre.propietario_id == int(propietario_id),
+                    DetalleCierre.producto.has(Producto.propietario_id == int(propietario_id))
+                )
+            )
         if proveedor_id:
-            query = query.filter(Producto.proveedor_id == proveedor_id)
+            query = query.filter(
+                or_(
+                    DetalleCierre.proveedor_id == int(proveedor_id),
+                    DetalleCierre.producto.has(Producto.proveedor_id == int(proveedor_id))
+                )
+            )
 
     # 2. Filtro de Fechas
     if fecha_inicio_str and fecha_fin_str:
@@ -1421,16 +1489,18 @@ def vista_reporte_cierres():
         resumen['diferencia'] += c.diferencia
 
         for d in c.detalles:
-            if not d.producto:
+            # Obtener ID de propietario y proveedor (de la foto congelada o fallback al producto)
+            d_prop_id = getattr(d, 'propietario_id', None) or (d.producto.propietario_id if d.producto else None)
+            d_prov_id = getattr(d, 'proveedor_id', None) or (d.producto.proveedor_id if d.producto else None)
+
+            if propietario_id and str(d_prop_id) != str(propietario_id):
                 continue
-                
-            if propietario_id and str(d.producto.propietario_id) != str(propietario_id):
-                continue
-            if proveedor_id and str(d.producto.proveedor_id) != str(proveedor_id):
+            if proveedor_id and str(d_prov_id) != str(proveedor_id):
                 continue
 
-            precio_costo_unitario = d.producto.precio_costo or 0.0
-            precio_venta_unitario = getattr(d.producto, 'precio', 0.0)
+            # Priorizar precio_costo congelado en el detalle 'd'
+            precio_costo_unitario = d.precio_costo if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0) else (d.producto.precio_costo if d.producto else 0.0)
+            precio_venta_unitario = d.precio_venta if (hasattr(d, 'precio_venta') and d.precio_venta is not None) else (d.producto.precio_venta if d.producto else 0.0)
             
             costo_total_item = d.vendidos * precio_costo_unitario
             ganancia_item = d.subtotal - costo_total_item
@@ -1442,8 +1512,8 @@ def vista_reporte_cierres():
                     'subtotal': 0.0,
                     'costo': 0.0,
                     'ganancia': 0.0,
-                    'precio_costo': precio_costo_unitario, # <--- NUEVO: Precio Costo Unitario
-                    'precio_venta': precio_venta_unitario   # <--- NUEVO: Precio Venta Unitario
+                    'precio_costo': precio_costo_unitario,
+                    'precio_venta': precio_venta_unitario
                 }
             
             resumen['productos'][nombre]['vendidos'] += d.vendidos
@@ -1470,7 +1540,6 @@ def vista_reporte_cierres():
             
             for nombre, datos in resumen['productos'].items():
                 if datos['vendidos'] > 0:
-                    # Incluye precio unitario de costo en el mensaje de WhatsApp
                     lineas_msg.append(f"▪ {nombre}: {datos['vendidos']} uds x ${datos['precio_costo']:,.2f} = ${datos['costo']:,.2f}")
             
             lineas_msg.append("-----------------------------")
@@ -1510,11 +1579,10 @@ def obtener_detalle_cierre(id_cierre):
 
     for d in cierre.detalles:
         producto = db.session.get(Producto, d.producto_id) if hasattr(db, 'session') else Producto.query.get(d.producto_id)
-        precio_costo = producto.precio_costo if producto else 0.0
         
-        # 1° Revisa si el detalle tiene el propietario guardado históricamente
-        # 2° Si no, busca el propietario del Producto en BD
-        # 3° Si el producto fue borrado y no tiene registro, asigna "Sin Propietario"
+        # Leer primero el precio de costo congelado en el detalle
+        precio_costo = d.precio_costo if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0) else (producto.precio_costo if producto else 0.0)
+        
         if hasattr(d, 'propietario_nombre') and d.propietario_nombre:
             propietario_nombre = d.propietario_nombre
         elif producto and producto.propietario:
@@ -1575,7 +1643,8 @@ def obtener_detalle_cierre(id_cierre):
             'total_esperado': cierre.total_esperado,
             'total_transferencias': cierre.total_transferencias or 0.0,
             'efectivo_caja': cierre.efectivo_caja,
-            'diferencia': cierre.diferencia
+            'diferencia': cierre.diferencia,
+            'observaciones': cierre.observaciones or ''  # <--- NUEVO: Enviar observaciones en el JSON
         },
         'detalles': detalles,
         'ganancias_propietarios': ganancias_por_propietario,

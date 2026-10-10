@@ -11,7 +11,7 @@ git add .
 2. Guardar el estado local con un mensaje claro
 Bash
 
-git commit -m "actualizacion de footer para que me de las diferencias y las deudas del dia"
+git commit -m "cuantas por pagar arregladas"
 
 3. Subir las actualizaciones a GitHub
 Bash

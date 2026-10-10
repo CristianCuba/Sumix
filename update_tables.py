@@ -1,25 +1,31 @@
-from app import app, db, CuentaPorPagar, Producto
+import os
+import sqlite3
 
-with app.app_context():
-    # Buscamos todos los productos que tienen estado 'Pagado' o 'pagado'
-    productos_pagados = Producto.query.filter(
-        db.func.lower(Producto.estado_pago) == 'pagado'
-    ).all()
+# Nombre de la base de datos definido en app.py
+DB_NAME = 'sumix.db'
+
+# Buscar la ruta exacta de la base de datos (soporta entorno con carpeta 'instance' o raíz)
+db_path = os.path.join('instance', DB_NAME)
+if not os.path.exists(db_path):
+    db_path = DB_NAME
+
+if not os.path.exists(db_path):
+    print(f"❌ Error: No se encontró el archivo de base de datos '{DB_NAME}' en 'instance/' ni en la raíz.")
+else:
+    print(f"📂 Base de datos encontrada en: {db_path}")
     
-    ids_pagados = [p.id for p in productos_pagados]
+    # Conectar y alterar la tabla
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
     
-    if ids_pagados:
-        # Buscamos las cuentas por pagar asociadas a estos productos
-        cuentas = CuentaPorPagar.query.filter(CuentaPorPagar.producto_id.in_(ids_pagados)).all()
-        
-        contador = 0
-        for cuenta in cuentas:
-            cuenta.monto_pendiente = 0.0
-            cuenta.cantidad = 0
-            cuenta.estado_pago = 'pagado'
-            contador += 1
-            
-        db.session.commit()
-        print(f"✅ ¡Se actualizaron {contador} deudas pendientes a estado 'PAGADO' correctamente!")
-    else:
-        print("⚠️ No se encontraron productos con estado 'Pagado'.")
+    try:
+        cursor.execute("ALTER TABLE cierres_dia ADD COLUMN observaciones TEXT;")
+        conn.commit()
+        print("✅ ¡Éxito! La columna 'observaciones' fue agregada correctamente a la tabla 'cierres_dia'.")
+    except sqlite3.OperationalError as e:
+        if "duplicate column name" in str(e).lower():
+            print("⚠️ Aviso: La columna 'observaciones' ya existía previamente en la base de datos.")
+        else:
+            print(f"❌ Error al ejecutar la consulta: {e}")
+    finally:
+        conn.close()

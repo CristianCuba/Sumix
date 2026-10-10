@@ -319,6 +319,7 @@ function calcular() {
 async function enviarCierre() {
     const efectivoCaja = parseFloat(document.getElementById('dinero-caja').value) || 0;
     const totalTransferencias = parseFloat(document.getElementById('dinero-transferencia').value) || 0;
+    const observaciones = document.getElementById('cierre-observaciones') ? document.getElementById('cierre-observaciones').value : ''; // <--- NUEVO: Capturar input de observaciones
     const filas = document.querySelectorAll('.fila-producto');
     let productos = [];
 
@@ -342,8 +343,9 @@ async function enviarCierre() {
             body: JSON.stringify({
                 efectivo_caja: efectivoCaja,
                 total_transferencias: totalTransferencias,
+                observaciones: observaciones, // <--- NUEVO: Enviar observaciones al backend
                 productos: productos,
-                deudas: [] // Array vacío ya que las deudas se gestionan en su vista independiente
+                deudas: [] 
             })
         });
 
@@ -381,6 +383,13 @@ async function verDetalleCierre(idCierre) {
 
         document.getElementById('modal-cierre-titulo').textContent = `Detalle del Cierre #${cierre.id}`;
         document.getElementById('modal-cierre-subtitulo').textContent = `Fecha: ${cierre.fecha} | Responsable: ${cierre.usuario_nombre}`;
+        
+        // --- NUEVO: Mostrar observaciones en el modal del admin ---
+        const elObs = document.getElementById('modal-observaciones');
+        if (elObs) {
+            elObs.textContent = cierre.observaciones || 'Sin observaciones registradas.';
+        }
+
         document.getElementById('modal-total-esperado').textContent = `$${cierre.total_esperado.toFixed(2)}`;
         
         // Asignación de transferencias al modal

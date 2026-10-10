@@ -54,8 +54,6 @@
         </div>
     </form>
 </section>
-<!-- Tarjeta de Subtotal Filtrado (Aparece resaltada si hay filtros activos) -->
-<!-- Resumen de Filtro (Solo visible si hay un filtro aplicado) -->
 
 <!-- Panel de Resumen Consolidado (Visible solo si hay filtro activo) -->
 {% if fecha_inicio %}
@@ -151,34 +149,30 @@
         </div>
 
         <div class="max-h-48 overflow-y-auto">
-            <!-- Asignamos el ID a la tabla -->
            <table id="tabla-productos-filtrados" class="w-full text-left text-sm border-collapse">
-    <thead>
-        <tr class="text-left text-xs text-gray-400 border-b border-gray-700">
-            <th class="pb-2">Producto</th>
-            <th class="pb-2">Cant. Vendida</th>
-            <th class="pb-2 text-right">Precio Costo U.</th> <!-- NUEVA COLUMNA -->
-            <th class="pb-2 text-right">Costo Total</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for nombre, datos in resumen.productos.items() %}
-        <tr class="border-b border-gray-800/50 text-sm">
-            <td class="py-3 text-white">{{ nombre }}</td>
-            <td class="py-3 text-gray-300">{{ datos.vendidos }}</td>
-            
-            <!-- Mostrar Precio de Costo Unitario -->
-            <td class="py-3 text-right text-gray-300 font-mono">
-                ${{ "{:,.2f}".format(datos.precio_costo) }}
-            </td>
-            
-            <td class="py-3 text-right font-semibold text-white font-mono">
-                ${{ "{:,.2f}".format(datos.costo) }}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+            <thead>
+                <tr class="text-left text-xs text-gray-400 border-b border-gray-700">
+                    <th class="pb-2">Producto</th>
+                    <th class="pb-2">Cant. Vendida</th>
+                    <th class="pb-2 text-right">Precio Costo U.</th>
+                    <th class="pb-2 text-right">Costo Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nombre, datos in resumen.productos.items() %}
+                <tr class="border-b border-gray-800/50 text-sm">
+                    <td class="py-3 text-white">{{ nombre }}</td>
+                    <td class="py-3 text-gray-300">{{ datos.vendidos }}</td>
+                    <td class="py-3 text-right text-gray-300 font-mono">
+                        ${{ "{:,.2f}".format(datos.precio_costo) }}
+                    </td>
+                    <td class="py-3 text-right font-semibold text-white font-mono">
+                        ${{ "{:,.2f}".format(datos.costo) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
         </div>
     </div>
 </section>
@@ -279,6 +273,12 @@
             </div>
         </div>
 
+        <!-- Bloque de Observaciones del Turno en el Modal -->
+        <div class="px-6 py-3 bg-[#16171a] border-b border-gray-800">
+            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Observaciones del Turno</h4>
+            <p id="modal-observaciones" class="text-sm text-gray-300 italic bg-[#121316] p-3 rounded-xl border border-gray-800/80">Sin observaciones.</p>
+        </div>
+
         <!-- Tabla con desglose de productos -->
         <div class="p-6 overflow-y-auto flex-1">
             <table class="w-full text-left border-collapse">
@@ -308,6 +308,7 @@
 
     </div>
 </div>
+
 <script>
 function copiarTabla(idTabla, boton) {
     const tabla = document.getElementById(idTabla);
@@ -319,7 +320,6 @@ function copiarTabla(idTabla, boton) {
     filas.forEach(fila => {
         const celdas = fila.querySelectorAll('th, td');
         const filaDatos = Array.from(celdas)
-            // Filtra celdas marcadas para omitir (ej. botones de acciones)
             .filter(celda => !celda.classList.contains('no-copiar'))
             .map(celda => celda.innerText.trim().replace(/\s+/g, ' '));
         
