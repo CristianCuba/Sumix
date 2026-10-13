@@ -1,31 +1,22 @@
-import os
-import sqlite3
+from app import app, db
 
-# Nombre de la base de datos definido en app.py
-DB_NAME = 'sumix.db'
-
-# Buscar la ruta exacta de la base de datos (soporta entorno con carpeta 'instance' o raíz)
-db_path = os.path.join('instance', DB_NAME)
-if not os.path.exists(db_path):
-    db_path = DB_NAME
-
-if not os.path.exists(db_path):
-    print(f"❌ Error: No se encontró el archivo de base de datos '{DB_NAME}' en 'instance/' ni en la raíz.")
-else:
-    print(f"📂 Base de datos encontrada en: {db_path}")
-    
-    # Conectar y alterar la tabla
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute("ALTER TABLE cierres_dia ADD COLUMN observaciones TEXT;")
-        conn.commit()
-        print("✅ ¡Éxito! La columna 'observaciones' fue agregada correctamente a la tabla 'cierres_dia'.")
-    except sqlite3.OperationalError as e:
-        if "duplicate column name" in str(e).lower():
-            print("⚠️ Aviso: La columna 'observaciones' ya existía previamente en la base de datos.")
-        else:
-            print(f"❌ Error al ejecutar la consulta: {e}")
-    finally:
-        conn.close()
+with app.app_context():
+    # Ejecutamos una sentencia SQL directa para crear la tabla si no existe, 
+    # evitando conflictos con el MetaData de SQLAlchemy.
+    db.session.execute(db.text("""
+        CREATE TABLE IF NOT EXISTS historial_perdidas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            producto_id INTEGER,
+            producto_nombre VARCHAR(100) NOT NULL,
+            propietario_id INTEGER,
+            concepto VARCHAR(100) NOT NULL,
+            cantidad FLOAT NOT NULL,
+            precio_costo FLOAT NOT NULL,
+            monto_perdida FLOAT NOT NULL,
+            fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (producto_id) REFERENCES productos (id),
+            FOREIGN KEY (propietario_id) REFERENCES propietarios (id)
+        )
+    """))
+    db.session.commit()
+    print("¡Tabla 'historial_perdidas' creada con éxito mediante SQL directo!")

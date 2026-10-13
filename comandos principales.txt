@@ -38,3 +38,42 @@ En caso de que se presente alguna eventualidad:
 activar venv
 
 venv\Scripts\activate
+
+
+actualizar la web
+
+¡Qué gran noticia que esté funcionando a full! 🎉
+
+Para responder a tu pregunta: No se actualiza de forma automática con solo hacer el git push a GitHub. PythonAnywhere no detecta los cambios por sí solo en su versión gratuita.
+
+Cada vez que modifiques algo en tu código local y quieras que se refleje en la nube, tendrás que hacer estos tres pasos muy rápidos:
+¿Cómo actualizar tu proyecto en la nube?
+
+    Sube tus cambios a GitHub (desde la terminal de tu computadora como lo hiciste antes):
+    Bash
+
+    git add .
+    git commit -m "Descripción de los cambios"
+    git push origin master
+
+    Descarga los cambios en PythonAnywhere:
+
+        Entra a tu cuenta de PythonAnywhere y abre una consola Bash.
+
+        Entra a la carpeta de tu proyecto:
+        Bash
+
+        cd sumix
+
+        Trae la última versión desde GitHub:
+        Bash
+
+        git pull origin master
+
+    Reinicia la aplicación web:
+
+        Ve a la pestaña Web en tu panel de PythonAnywhere.
+
+        Haz clic en el botón verde Reload CristianCuba.pythonanywhere.com.
+
+¡Y listo! Con eso tu sistema se actualizará de inmediato con las nuevas funciones o correcciones que programes. ¿Todo claro con este flujo de actualización?

@@ -22,7 +22,20 @@ app.register_blueprint(compras_bp)
 # ==========================================
 # MODELOS PARA MÓDULO BALANCE Y PATRIMONIO
 # ==========================================
+class HistorialPerdida(db.Model):
+    __tablename__ = 'historial_perdidas'
+    id = db.Column(db.Integer, primary_key=True)
+    producto_id = db.Column(db.Integer, db.ForeignKey('productos.id'), nullable=True)
+    producto_nombre = db.Column(db.String(100), nullable=False)
+    propietario_id = db.Column(db.Integer, db.ForeignKey('propietarios.id'), nullable=True)
+    concepto = db.Column(db.String(100), nullable=False)  # Ej: "Merma", "Consumo interno"
+    cantidad = db.Column(db.Float, nullable=False)
+    precio_costo = db.Column(db.Float, nullable=False)
+    monto_perdida = db.Column(db.Float, nullable=False)  # cantidad * precio_costo
+    fecha = db.Column(db.DateTime, default=datetime.now)
 
+    producto = db.relationship('Producto', backref='perdidas')
+    propietario = db.relationship('Propietario', backref='perdidas')
 class PrestamoTercero(db.Model):
     """Registro de dinero del negocio prestado a personas externas."""
     __tablename__ = 'prestamos_terceros'
@@ -1086,55 +1099,40 @@ def trasladar_stock():
     destino_id = request.form.get('almacen_destino_id', type=int)
     cantidad = request.form.get('cantidad', type=float, default=0.0)
 
-    print(f"DEBUGGING -> producto_id recibido: {producto_id}")
-    print(f"DEBUGGING -> origen_id recibido: {origen_id}")
-    print(f"DEBUGGING -> cantidad recibida: {cantidad}")
-
     # Validaciones básicas generales
     if not producto_id or not tipo_operacion_id or not concepto_id or cantidad <= 0:
         flash("Error: Faltan datos obligatorios o la cantidad es inválida.", "danger")
         return redirect(url_for('vista_admin'))
 
-    # Buscar el tipo de operación
     tipo_op = TipoOperacion.query.get(tipo_operacion_id)
     if not tipo_op:
         flash("Error: El tipo de operación seleccionado no es válido.", "danger")
         return redirect(url_for('vista_admin'))
 
-    # Limpiamos y convertimos a minúsculas
     comportamiento = tipo_op.codigo.strip().lower() if tipo_op.codigo else ""
-
-    # Diagnóstico en vivo de los stocks reales en la base de datos para este producto
-    stocks_existentes = StockAlmacen.query.filter_by(producto_id=producto_id).all()
-    print(f"DEBUGGING -> Pares (almacen_id, cantidad) reales en BD para este producto: {[(s.almacen_id, s.cantidad) for s in stocks_existentes]}")
 
     # 1. COMPORTAMIENTO: TRASLADO (Origen -> Destino)
     if comportamiento.startswith('traslado'):
-        if not origen_id or not destino_id:
-            flash("Error: El traslado requiere un almacén de origen y un almacén de destino.", "danger")
-            return redirect(url_for('vista_admin'))
-        
-        if origen_id == destino_id:
-            flash("Error: El origen y el destino no pueden ser el mismo almacén.", "danger")
+        if not origen_id or not destino_id or origen_id == destino_id:
+            flash("Error: Origen y destino inválidos para el traslado.", "danger")
             return redirect(url_for('vista_admin'))
         
         stock_origen = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=origen_id).first()
         if not stock_origen or stock_origen.cantidad < cantidad:
-            flash("Error: No hay suficiente stock en el almacén de origen para realizar este traslado.", "danger")
+            flash("Error: Stock insuficiente en el almacén de origen.", "danger")
             return redirect(url_for('vista_admin'))
         
         stock_origen.cantidad -= cantidad
-
         stock_destino = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=destino_id).first()
         if stock_destino:
             stock_destino.cantidad += cantidad
         else:
             db.session.add(StockAlmacen(producto_id=producto_id, almacen_id=destino_id, cantidad=cantidad))
 
-    # 2. COMPORTAMIENTO: ENTRADA (Solo Destino / Incrementa stock)
+    # 2. COMPORTAMIENTO: ENTRADA (Solo Destino)
     elif comportamiento.startswith('entrada'):
         if not destino_id:
-            flash("Error: La entrada requiere seleccionar un almacén de destino.", "danger")
+            flash("Error: La entrada requiere un almacén de destino.", "danger")
             return redirect(url_for('vista_admin'))
         
         stock_destino = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=destino_id).first()
@@ -1143,31 +1141,72 @@ def trasladar_stock():
         else:
             db.session.add(StockAlmacen(producto_id=producto_id, almacen_id=destino_id, cantidad=cantidad))
 
-    # 3. COMPORTAMIENTO: SALIDA (Solo Origen / Disminuye stock)
+    # 3. COMPORTAMIENTO: SALIDA (Solo Origen)
     elif comportamiento.startswith('salida'):
         if not origen_id:
             flash("Error: La salida requiere seleccionar un almacén de origen.", "danger")
             return redirect(url_for('vista_admin'))
         
         stock_origen = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=origen_id).first()
-        if not stock_origen:
-            flash("Error: Este producto no tiene registros de stock en el almacén seleccionado.", "danger")
-            return redirect(url_for('vista_admin'))
-            
-        if stock_origen.cantidad < cantidad:
-            flash(f"Error: Stock insuficiente. Intentas retirar {cantidad}, pero solo hay {stock_origen.cantidad} disponibles.", "danger")
+        if not stock_origen or stock_origen.cantidad < cantidad:
+            flash(f"Error: Stock insuficiente en el almacén.", "danger")
             return redirect(url_for('vista_admin'))
         
         stock_origen.cantidad -= cantidad
 
+        producto_afectado = Producto.query.get(producto_id)
+        concepto_obj = ConceptoMovimiento.query.get(concepto_id)
+
+        # --- CASO A: DEVOLUCIÓN AL PROVEEDOR (ID 6) ---
+        if concepto_id == 6:
+            # Buscamos la cuenta por pagar pendiente de este producto
+            cuenta_pendiente = CuentaPorPagar.query.filter_by(
+                producto_id=producto_id
+            ).filter(CuentaPorPagar.monto_pendiente > 0).first()
+
+            if cuenta_pendiente:
+                # Calculamos el precio unitario original de esa deuda
+                precio_unitario = cuenta_pendiente.monto_pendiente / cuenta_pendiente.cantidad if cuenta_pendiente.cantidad > 0 else (producto_afectado.precio_costo or 0.0)
+                
+                unidades_a_descontar = min(cantidad, cuenta_pendiente.cantidad)
+                monto_a_restar = unidades_a_descontar * precio_unitario
+
+                cuenta_pendiente.cantidad -= unidades_a_descontar
+                cuenta_pendiente.monto_pendiente -= monto_a_restar
+
+                # Si se cubrió toda la deuda de este producto, se marca como pagado/saldado
+                if cuenta_pendiente.cantidad <= 0 or cuenta_pendiente.monto_pendiente <= 0:
+                    cuenta_pendiente.cantidad = 0
+                    cuenta_pendiente.monto_pendiente = 0.0
+                    cuenta_pendiente.estado = 'pagado'
+                
+                flash(f"Devolución aplicada: Se descontaron {unidades_a_descontar} unidades de la cuenta por pagar.", "success")
+            else:
+                flash("Advertencia: Se descontó del inventario, pero este producto no tiene ninguna Cuenta por Pagar pendiente activa.", "warning")
+
+        # --- CASO B: MERMA (ID 3), VENTA INTERNA (ID 4) O CONSUMO INTERNO (ID 5) ---
+        elif concepto_id in [3, 4, 5]:
+            costo_unitario = producto_afectado.precio_costo or 0.0
+            total_perdida = cantidad * costo_unitario
+
+            nueva_perdida = HistorialPerdida(
+                producto_id=producto_afectado.id,
+                producto_nombre=producto_afectado.nombre,
+                propietario_id=producto_afectado.propietario_id,
+                concepto=concepto_obj.nombre if concepto_obj else "Pérdida",
+                cantidad=cantidad,
+                precio_costo=costo_unitario,
+                monto_perdida=total_perdida
+            )
+            db.session.add(nueva_perdida)
+
     else:
-        flash(f"Error: El código de comportamiento '{tipo_op.codigo}' no está reconocido.", "danger")
+        flash(f"Error: El código de comportamiento no está reconocido.", "danger")
         return redirect(url_for('vista_admin'))
 
     db.session.commit()
-    flash("¡Movimiento registrado y stock actualizado con éxito!", "success")
+    flash("¡Operación y ajustes contables procesados con éxito!", "success")
     return redirect(url_for('vista_admin'))
-from datetime import datetime
 
 from datetime import datetime
 
@@ -1798,6 +1837,50 @@ def guardar_usuario():
 
     flash("Usuario creado y vinculado al almacén exitosamente.", "success")
     return redirect(url_for('vista_usuarios'))
+@app.route('/admin/usuarios/cambiar-password/<int:id>', methods=['POST'])
+def admin_cambiar_password(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return redirect(url_for('login'))
+        
+    usuario = Usuario.query.get_or_404(id)
+    nuevo_password = request.form.get('nuevo_password')
+    
+    if nuevo_password:
+        usuario.password = nuevo_password  # Si usas hash, aquí iría el generador de hash
+        db.session.commit()
+        flash(f"Contraseña de '{usuario.username}' actualizada exitosamente.", "success")
+    else:
+        flash("La contraseña no puede estar vacía.", "danger")
+        
+    return redirect(url_for('vista_usuarios'))
+
+@app.route('/perfil/cambiar-password', methods=['POST'])
+def cambiar_mi_password():
+    if 'user' not in session:
+        return redirect(url_for('login'))
+        
+    username_actual = session.get('user')
+    usuario = Usuario.query.filter_by(username=username_actual).first()
+    
+    if not usuario:
+        return redirect(url_for('login'))
+        
+    password_actual = request.form.get('password_actual')
+    nuevo_password = request.form.get('nuevo_password')
+    confirmar_password = request.form.get('confirmar_password')
+    
+    if usuario.password != password_actual:
+        flash("La contraseña actual es incorrecta.", "danger")
+        return redirect(url_for('inicio'))
+        
+    if not nuevo_password or nuevo_password != confirmar_password:
+        flash("Las nuevas contraseñas no coinciden o están vacías.", "danger")
+        return redirect(url_for('inicio'))
+        
+    usuario.password = nuevo_password
+    db.session.commit()
+    flash("Tu contraseña ha sido actualizada correctamente.", "success")
+    return redirect(url_for('inicio'))
 
 @app.route('/admin/usuarios/eliminar/<int:id>', methods=['POST'])
 def eliminar_usuario(id):

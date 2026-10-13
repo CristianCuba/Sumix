@@ -49,7 +49,13 @@
                         <span class="text-xs text-gray-500 italic">Sin asignar</span>
                         {% endif %}
                     </td>
-                    <td class="p-4 text-right">
+                    <td class="p-4 text-right space-x-2">
+                        <!-- Botón para cambiar clave de este usuario -->
+                        <button onclick="abrirModalPasswordAdmin({{ u.id }}, '{{ u.username }}')"
+                            class="text-orange-400 hover:text-orange-300 text-xs font-semibold px-2.5 py-1 bg-orange-500/10 rounded-lg hover:bg-orange-500/20 transition">
+                            Cambiar Clave
+                        </button>
+
                         {% if u.username != session.get('user') %}
                         <form action="{{ url_for('eliminar_usuario', id=u.id) }}" method="POST" class="inline"
                             onsubmit="return confirm('¿Seguro que deseas eliminar este usuario?');">
@@ -122,6 +128,31 @@
     </div>
 </div>
 
+<!-- Modal: Cambiar Contraseña por Admin -->
+<div id="modal-password-admin" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+            <h3 class="text-base font-bold text-white">Cambiar Clave: <span id="admin-username-target" class="text-orange-400"></span></h3>
+            <button onclick="cerrarModalPasswordAdmin()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+        </div>
+
+        <form id="form-password-admin" method="POST" class="space-y-4 text-sm">
+            <div>
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nueva Contraseña *</label>
+                <input type="password" name="nuevo_password" required placeholder="Nueva contraseña..."
+                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                <button type="button" onclick="cerrarModalPasswordAdmin()"
+                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm transition">Cancelar</button>
+                <button type="submit"
+                    class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20 transition">Actualizar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <script>
     function abrirModalUsuario() {
         const modal = document.getElementById('modal-usuario');
@@ -131,6 +162,24 @@
 
     function cerrarModalUsuario() {
         const modal = document.getElementById('modal-usuario');
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
+
+    function abrirModalPasswordAdmin(userId, username) {
+        const modal = document.getElementById('modal-password-admin');
+        const form = document.getElementById('form-password-admin');
+        const spanUser = document.getElementById('admin-username-target');
+        
+        form.action = `/admin/usuarios/cambiar-password/${userId}`;
+        spanUser.textContent = username;
+        
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function cerrarModalPasswordAdmin() {
+        const modal = document.getElementById('modal-password-admin');
         modal.classList.remove('flex');
         modal.classList.add('hidden');
     }

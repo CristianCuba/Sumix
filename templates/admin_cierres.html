@@ -153,21 +153,29 @@
             <thead>
                 <tr class="text-left text-xs text-gray-400 border-b border-gray-700">
                     <th class="pb-2">Producto</th>
-                    <th class="pb-2">Cant. Vendida</th>
+                    <th class="pb-2 text-center">Cant. Vendida</th>
                     <th class="pb-2 text-right">Precio Costo U.</th>
                     <th class="pb-2 text-right">Costo Total</th>
+                    <th class="pb-2 text-right">Precio Venta U.</th> <!-- NUEVA COLUMNA -->
+                    <th class="pb-2 text-right">Importe Venta</th>   <!-- NUEVA COLUMNA -->
                 </tr>
             </thead>
             <tbody>
                 {% for nombre, datos in resumen.productos.items() %}
                 <tr class="border-b border-gray-800/50 text-sm">
                     <td class="py-3 text-white">{{ nombre }}</td>
-                    <td class="py-3 text-gray-300">{{ datos.vendidos }}</td>
+                    <td class="py-3 text-center text-gray-300">{{ datos.vendidos }}</td>
                     <td class="py-3 text-right text-gray-300 font-mono">
                         ${{ "{:,.2f}".format(datos.precio_costo) }}
                     </td>
                     <td class="py-3 text-right font-semibold text-white font-mono">
                         ${{ "{:,.2f}".format(datos.costo) }}
+                    </td>
+                    <td class="py-3 text-right text-gray-300 font-mono">
+                        ${{ "{:,.2f}".format(datos.precio_venta) }}
+                    </td>
+                    <td class="py-3 text-right font-semibold text-emerald-400 font-mono">
+                        ${{ "{:,.2f}".format(datos.subtotal) }}
                     </td>
                 </tr>
                 {% endfor %}

@@ -45,7 +45,6 @@
             <span>📝</span> Registrar Nuevo Fiado / Deuda
         </h2>
 
-        <!-- Modificadas las columnas para que entren los 5 elementos (3+3+2+2+2 = 12 columnas) -->
         <form action="{{ url_for('guardar_deuda') }}" method="POST" class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-[#121316] p-4 rounded-xl border border-gray-800 text-sm">
             <div class="sm:col-span-3">
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Deudor / Concepto *</label>
@@ -70,7 +69,6 @@
                     class="w-full bg-[#1a1b1e] border border-gray-700 rounded-xl p-2.5 text-white text-center font-mono focus:border-orange-500 focus:outline-none">
             </div>
 
-            <!-- NUEVO: Campo de Fecha -->
             <div class="sm:col-span-2">
                 <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Fecha *</label>
                 <input type="date" id="fecha-deuda" name="fecha" required
@@ -88,16 +86,30 @@
 
     <!-- Tabla: Deudas Pendientes -->
     <div class="space-y-3">
-        <h3 class="text-base font-bold text-white flex items-center gap-2">
-            <span>🔴</span> Deudas Pendientes
-        </h3>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+                <span>🔴</span> Deudas Pendientes
+            </h3>
+            
+            <!-- NUEVO: Input de Filtro y Subtotal de la busqueda -->
+            <div class="flex items-center gap-3">
+                <div class="text-xs text-gray-400 bg-[#121316] border border-gray-800 px-3 py-2 rounded-xl">
+                    Subtotal Filtrado: <span id="subtotal-filtrado" class="font-mono font-bold text-rose-400">$0.00</span>
+                </div>
+                <div class="relative">
+                    <input type="text" id="buscador-deudas" placeholder="Filtrar deudas..." 
+                        class="bg-[#1a1b1e] border border-gray-700 rounded-xl px-3 py-1.5 text-xs text-white placeholder-gray-500 focus:border-orange-500 focus:outline-none w-48 sm:w-64">
+                </div>
+            </div>
+        </div>
+
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-sm">
                     <thead>
                         <tr class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase">
                             <th class="p-4"># ID</th>
-                            <th class="p-4">Fecha</th> <!-- NUEVO -->
+                            <th class="p-4">Fecha</th>
                             <th class="p-4">Deudor / Concepto</th>
                             <th class="p-4">Producto</th>
                             <th class="p-4 text-center">Cantidad</th>
@@ -106,11 +118,10 @@
                             <th class="p-4 text-center">Acción</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-800/60 text-gray-300">
+                    <tbody id="tabla-deudas-body" class="divide-y divide-gray-800/60 text-gray-300">
                         {% for d in deudas %}
-                        <tr class="hover:bg-gray-800/30">
+                        <tr class="hover:bg-gray-800/30 fila-deuda" data-subtotal="{{ d.subtotal }}">
                             <td class="p-4 font-mono text-xs text-gray-500">#{{ d.id }}</td>
-                            <!-- Mostrar Fecha -->
                             <td class="p-4 text-xs font-mono text-gray-400">
                                 {{ d.fecha.strftime('%Y-%m-%d') if d.fecha else 'N/A' }}
                             </td>
@@ -123,7 +134,7 @@
                                 {% endif %}
                             </td>
                             <td class="p-4 text-center font-mono text-orange-400 font-bold">{{ d.cantidad }}</td>
-                            <td class="p-4 text-right font-mono font-bold text-rose-400">
+                            <td class="p-4 text-right font-mono font-bold text-rose-400 valor-subtotal">
                                 ${{ "%.2f"|format(d.subtotal) }}
                             </td>
                             <td class="p-4 text-center">
@@ -141,7 +152,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr>
+                        <tr id="fila-vacia-tabla">
                             <td colspan="8" class="p-8 text-center text-gray-500 italic">No hay deudas o fiados pendientes registrados.</td>
                         </tr>
                         {% endfor %}
@@ -162,7 +173,7 @@
                     <thead>
                         <tr class="bg-[#121316] border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase">
                             <th class="p-4"># ID</th>
-                            <th class="p-4">Fecha</th> <!-- NUEVO -->
+                            <th class="p-4">Fecha</th>
                             <th class="p-4">Deudor / Concepto</th>
                             <th class="p-4">Producto</th>
                             <th class="p-4 text-center">Cantidad</th>
@@ -174,7 +185,6 @@
                         {% for h in historial %}
                         <tr class="hover:bg-gray-800/30">
                             <td class="p-4 font-mono text-xs text-gray-500">#{{ h.id }}</td>
-                            <!-- Mostrar Fecha -->
                             <td class="p-4 text-xs font-mono text-gray-400">
                                 {{ h.fecha.strftime('%Y-%m-%d') if h.fecha else 'N/A' }}
                             </td>
@@ -202,19 +212,48 @@
     </div>
 </main>
 
-<!-- SCRIPT para rellenar la fecha automáticamente -->
+<!-- SCRIPT para fecha automática y filtro con cálculo de subtotal -->
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // 1. Rellenar fecha actual
         const inputFecha = document.getElementById('fecha-deuda');
         if (inputFecha) {
-            // Generar la fecha de hoy ajustada a la zona horaria local
             const hoy = new Date();
             hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
-            
-            // Asignar el valor en formato 'YYYY-MM-DD'
             inputFecha.value = hoy.toISOString().slice(0, 10);
         }
+
+        // 2. Lógica del Filtro y Subtotal Dinámico
+        const buscador = document.getElementById('buscador-deudas');
+        const filas = document.querySelectorAll('.fila-deuda');
+        const spanSubtotal = document.getElementById('subtotal-filtrado');
+
+        function actualizarFiltroYSubtotal() {
+            const textoBusqueda = buscador.value.toLowerCase().trim();
+            let acumuladoSubtotal = 0;
+
+            filas.forEach(fila => {
+                const contenidoFila = fila.textContent.toLowerCase();
+                if (contenidoFila.includes(textoBusqueda)) {
+                    fila.style.display = '';
+                    const subtotalVal = parseFloat(fila.getAttribute('data-subtotal')) || 0;
+                    acumuladoSubtotal += subtotalVal;
+                } else {
+                    fila.style.display = 'none';
+                }
+            });
+
+            // Mostrar el subtotal formateado con 2 decimales
+            if (spanSubtotal) {
+                spanSubtotal.textContent = '$' + acumuladoSubtotal.toFixed(2);
+            }
+        }
+
+        if (buscador) {
+            buscador.addEventListener('input', actualizarFiltroYSubtotal);
+            // Ejecutar al cargar para inicializar con el total completo
+            actualizarFiltroYSubtotal();
+        }
     });
-    
 </script>
 {% endblock %}
