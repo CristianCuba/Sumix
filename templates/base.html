@@ -15,11 +15,13 @@
     
     <!-- Cargar archivo JS externo -->
     <script src="{{ url_for('static', filename='js/mains.js') }}"></script>
+    <!-- jsPDF y AutoTable -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
     <!-- Inicializar datos de Flask -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            // Envolver en comillas para que JS siempre lo interprete como String limpio
             const rawData = '{{ stock_map | safe if stock_map else "{}" }}';
             
             try {
@@ -31,7 +33,6 @@
             }
         });
     </script>
-    
 </head>
 
 <body class="h-full bg-[#121316] text-gray-200 flex overflow-hidden">
@@ -73,7 +74,7 @@
                     </svg>
                 </a>
     
-                <!-- NUEVA OPCIÓN: Módulo de Compras / Presupuesto -->
+                <!-- Módulo de Compras / Presupuesto -->
                 <a href="{{ url_for('compras.vista_compras') }}" title="Cálculo de Compras"
                     class="p-3 rounded-2xl flex items-center justify-center transition-all border {{ 'bg-orange-600/10 border-orange-500/30 text-orange-500' if request.endpoint == 'compras.vista_compras' else 'border-transparent text-gray-400 hover:text-white hover:bg-gray-800' }}">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,7 +83,7 @@
                     </svg>
                 </a>
     
-                <!-- Opción 2: Cuentas por Pagar -->
+                <!-- Cuentas por Pagar -->
                 <a href="{{ url_for('cuentas_por_pagar') }}" title="Cuentas por Pagar"
                     class="p-3 rounded-2xl flex items-center justify-center transition-all border {{ 'bg-orange-600/10 border-orange-500/30 text-orange-500' if request.endpoint == 'cuentas_por_pagar' else 'border-transparent text-gray-400 hover:text-white hover:bg-gray-800' }}">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,7 +93,7 @@
                     </svg>
                 </a>
     
-                <!-- Opción 3: Usuarios / Ajustes (Opcional) -->
+                <!-- Usuarios -->
                 <a href="/admin/usuarios" title="Usuarios"
                     class="p-3 rounded-2xl flex items-center justify-center transition-all border border-transparent text-gray-400 hover:text-white hover:bg-gray-800">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,31 +101,35 @@
                             d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                     </svg>
                 </a>
+                
                 <a href="{{ url_for('vista_balance') }}" title="Balance y Patrimonio" 
-    class="p-3 text-gray-400 hover:text-orange-400 hover:bg-gray-800/50 rounded-xl transition flex items-center justify-center group">
-    <svg class="w-6 h-6 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-    </svg>
-</a>
+                    class="p-3 text-gray-400 hover:text-orange-400 hover:bg-gray-800/50 rounded-xl transition flex items-center justify-center group">
+                    <svg class="w-6 h-6 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                </a>
 
-<!-- Enlace: Deudas / Fiados -->
-<a href="{{ url_for('vista_deudas') }}" title="Deudas y Fiados" 
-    class="p-3 text-gray-400 hover:text-orange-400 hover:bg-gray-800/50 rounded-xl transition flex items-center justify-center group">
-    <svg class="w-6 h-6 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-    </svg>
-</a>
+                <!-- Deudas / Fiados -->
+                <a href="{{ url_for('vista_deudas') }}" title="Deudas y Fiados" 
+                    class="p-3 text-gray-400 hover:text-orange-400 hover:bg-gray-800/50 rounded-xl transition flex items-center justify-center group">
+                    <svg class="w-6 h-6 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                </a>
 
-<!-- Botón: Cambiar Clave -->
-<button onclick="abrirModalMiPassword()" title="Cambiar mi Contraseña" 
-    class="p-3 text-gray-400 hover:text-orange-400 hover:bg-gray-800/50 rounded-xl transition flex items-center justify-center group w-full">
-    <svg class="w-6 h-6 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-    </svg>
-</button>
+                <!-- Botón: Cambiar Clave -->
+                <button onclick="abrirModalMiPassword()" title="Cambiar mi Contraseña" 
+                    class="p-3 text-gray-400 hover:text-orange-400 hover:bg-gray-800/50 rounded-xl transition flex items-center justify-center group w-full">
+                    <svg class="w-6 h-6 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                </button>
+            </nav>
+        </div>
+
         <!-- Botón Inferior: Salir -->
         <a href="{{ url_for('logout') }}" title="Cerrar Sesión"
             class="p-3 rounded-2xl text-red-400 hover:text-white hover:bg-red-600/20 transition-all border border-transparent hover:border-red-500/30">
@@ -136,59 +141,75 @@
     </aside>
 
     <!-- ÁREA DE CONTENIDO PRINCIPAL -->
-    <main class="flex-1 overflow-y-auto h-screen">
+    <main class="flex-1 overflow-y-auto h-screen flex flex-col">
+        
+        <!-- Mensajes Flash reubicados correctamente dentro del área principal -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            <div class="px-6 pt-4 space-y-2">
+              {% for category, message in messages %}
+                <div class="p-4 text-sm rounded-xl shadow-lg {% if category == 'danger' or category == 'error' %}bg-red-900 text-white{% else %}bg-emerald-900 text-white{% endif %} flex justify-between items-center">
+                  <span>{{ message }}</span>
+                  <button onclick="this.parentElement.remove()" class="text-white font-bold ml-4">&times;</button>
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
         {% block content %}{% endblock %}
     </main>
-<!-- Modal: Cambiar Mi Contraseña -->
-<div id="modal-mi-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-        <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
-            <h3 class="text-lg font-bold text-white">Cambiar mi Contraseña</h3>
-            <button onclick="cerrarModalMiPassword()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+
+    <!-- Modal: Cambiar Mi Contraseña -->
+    <div id="modal-mi-password" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b border-gray-800 pb-3">
+                <h3 class="text-lg font-bold text-white">Cambiar mi Contraseña</h3>
+                <button onclick="cerrarModalMiPassword()" class="text-gray-400 hover:text-white text-xl font-bold">&times;</button>
+            </div>
+
+            <form action="{{ url_for('cambiar_mi_password') }}" method="POST" class="space-y-4 text-sm">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Contraseña Actual *</label>
+                    <input type="password" name="password_actual" required placeholder="••••••••"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nueva Contraseña *</label>
+                    <input type="password" name="nuevo_password" required placeholder="••••••••"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Confirmar Nueva Contraseña *</label>
+                    <input type="password" name="confirmar_password" required placeholder="••••••••"
+                        class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
+                    <button type="button" onclick="cerrarModalMiPassword()"
+                        class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm transition">Cancelar</button>
+                    <button type="submit"
+                        class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20 transition">Actualizar Clave</button>
+                </div>
+            </form>
         </div>
-
-        <form action="{{ url_for('cambiar_mi_password') }}" method="POST" class="space-y-4 text-sm">
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Contraseña Actual *</label>
-                <input type="password" name="password_actual" required placeholder="••••••••"
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Nueva Contraseña *</label>
-                <input type="password" name="nuevo_password" required placeholder="••••••••"
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-            </div>
-
-            <div>
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Confirmar Nueva Contraseña *</label>
-                <input type="password" name="confirmar_password" required placeholder="••••••••"
-                    class="w-full bg-[#121316] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-            </div>
-
-            <div class="flex justify-end gap-3 mt-6 border-t border-gray-800 pt-4">
-                <button type="button" onclick="cerrarModalMiPassword()"
-                    class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 font-medium rounded-xl text-sm transition">Cancelar</button>
-                <button type="submit"
-                    class="px-5 py-2 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl text-sm shadow-lg shadow-orange-600/20 transition">Actualizar Clave</button>
-            </div>
-        </form>
     </div>
-</div>
 
-<script>
-    function abrirModalMiPassword() {
-        const modal = document.getElementById('modal-mi-password');
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-    }
+    <script>
+        function abrirModalMiPassword() {
+            const modal = document.getElementById('modal-mi-password');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
 
-    function cerrarModalMiPassword() {
-        const modal = document.getElementById('modal-mi-password');
-        modal.classList.remove('flex');
-        modal.classList.add('hidden');
-    }
-</script>
+        function cerrarModalMiPassword() {
+            const modal = document.getElementById('modal-mi-password');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+    </script>
 </body>
 
 </html>

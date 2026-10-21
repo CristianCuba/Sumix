@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify
+from sqlalchemy import or_
 
 compras_bp = Blueprint('compras', __name__, template_folder='templates')
 
@@ -44,7 +45,7 @@ def vista_compras():
     with app.app_context():
         proveedores = Proveedor.query.all()
         propietarios = Propietario.query.all()
-        productos = Producto.query.all()
+        productos = Producto.query.filter(or_(Producto.activo == True, Producto.activo.is_(None))).all()
 
         saldos_socios = {}
         for prop in propietarios:

@@ -73,15 +73,14 @@
     </div>
 
     <!-- Sección de Préstamos Activos -->
-    {% if prestamos %}
-    <section class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl mb-8">
+    <section class="bg-[#1a1b1e] border border-gray-800 rounded-2xl shadow-2xl mb-8">
         <div class="p-4 border-b border-gray-800 flex justify-between items-center">
             <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
-                Préstamos a Terceros Activos
+                Préstamos a Terceros Activos (Total: {{ prestamos|length }})
             </h3>
         </div>
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto w-full">
             <table class="w-full text-left border-collapse text-xs">
                 <thead>
                     <tr class="border-b border-gray-800 text-gray-400 uppercase bg-[#222429]">
@@ -89,27 +88,50 @@
                         <th class="p-3">Deudor</th>
                         <th class="p-3">Concepto</th>
                         <th class="p-3">Fecha</th>
-                        <th class="p-3 text-right">Monto Pendiente</th>
+                        <th class="p-3">Monto Pendiente</th>
+                        <th class="p-3 text-right">Acciones</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-800/60 text-gray-300">
-                    {% for p in prestamos %}
-                    <tr class="hover:bg-gray-800/30 transition">
-                        <td class="p-3 font-bold text-white">{{ p.propietario.nombre }}</td>
-                        <td class="p-3 text-cyan-300 font-semibold">{{ p.deudor_nombre }}</td>
-                        <td class="p-3 text-gray-400">{{ p.concepto or 'Sin especificar' }}</td>
-                        <td class="p-3 font-mono text-gray-400">{{ p.fecha.strftime('%d/%m/%Y') }}</td>
-                        <td class="p-3 text-right font-mono font-bold text-cyan-400">${{ "%.2f"|format(p.saldo_pendiente) }}</td>
+                    {% if prestamos %}
+                        {% for p in prestamos %}
+                        <tr class="hover:bg-gray-800/30 transition">
+                            <td class="p-3 font-bold text-white">
+                                {{ p.propietario.nombre if p.propietario else 'CRISTIAN' }}
+                            </td>
+                            <td class="p-3 text-cyan-300 font-semibold">
+                                {{ p.deudor_nombre or 'Sin nombre' }}
+                            </td>
+                            <td class="p-3 text-gray-400">
+                                {{ p.concepto if p.concepto and p.concepto != '""' and p.concepto != "''" else 'Sin especificar' }}
+                            </td>
+                            <td class="p-3 font-mono text-gray-400">
+                                {{ p.fecha if p.fecha else 'N/A' }}
+                            </td>
+                            <td class="p-3 font-mono font-bold text-cyan-400">
+                                ${{ "%.2f"|format(p.saldo_pendiente or 0.0) }}
+                            </td>
+                            <td class="p-3 text-right">
+                                <button onclick="cobrarPrestamo({{ p.id }}, {{ p.saldo_pendiente }})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-semibold transition">
+                                    Cobrar / Saldar
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="p-6 text-center text-gray-500">
+                            No hay préstamos activos registrados.
+                        </td>
                     </tr>
-                    {% endfor %}
+                    {% endif %}
                 </tbody>
             </table>
         </div>
     </section>
-    {% endif %}
 
     <!-- Histórico de Snapshots congelados -->
-    <section class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+    <section class="bg-[#1a1b1e] border border-gray-800 rounded-2xl shadow-2xl">
         <div class="p-4 border-b border-gray-800 flex justify-between items-center">
             <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-orange-400"></span>
@@ -294,6 +316,29 @@ async function guardarSnapshot() {
     const result = await res.json();
     if(result.success) location.reload();
     else alert("Error: " + result.message);
+}
+async function cobrarPrestamo(id, saldoMaximo) {
+    let montoInput = prompt("Ingrese el monto a cobrar/amortizar (Deje el valor total para saldar por completo):", saldoMaximo);
+    if (montoInput === null) return; // Cancelado por el usuario
+    
+    let monto = parseFloat(montoInput);
+    if (isNaN(monto) || monto <= 0) {
+        alert("Por favor ingrese un monto válido.");
+        return;
+    }
+
+    const res = await fetch(`/admin/balance/prestamo/pagar/${id}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ monto: monto })
+    });
+    
+    const result = await res.json();
+    if (result.success) {
+        location.reload();
+    } else {
+        alert("Error: " + result.message);
+    }
 }
 </script>
 {% endblock %}

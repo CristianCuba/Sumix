@@ -1,22 +1,23 @@
-from app import app, db
+from app import app, db, Producto, StockAlmacen
 
-with app.app_context():
-    # Ejecutamos una sentencia SQL directa para crear la tabla si no existe, 
-    # evitando conflictos con el MetaData de SQLAlchemy.
-    db.session.execute(db.text("""
-        CREATE TABLE IF NOT EXISTS historial_perdidas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            producto_id INTEGER,
-            producto_nombre VARCHAR(100) NOT NULL,
-            propietario_id INTEGER,
-            concepto VARCHAR(100) NOT NULL,
-            cantidad FLOAT NOT NULL,
-            precio_costo FLOAT NOT NULL,
-            monto_perdida FLOAT NOT NULL,
-            fecha DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (producto_id) REFERENCES productos (id),
-            FOREIGN KEY (propietario_id) REFERENCES propietarios (id)
-        )
-    """))
-    db.session.commit()
-    print("¡Tabla 'historial_perdidas' creada con éxito mediante SQL directo!")
+def limpiar_stock_inactivos():
+    with app.app_context():
+        inactivos = Producto.query.filter(Producto.activo == False).all()
+        
+        if not inactivos:
+            print("No hay productos inactivos.")
+            return
+
+        print(f"Procesando {len(inactivos)} productos inactivos para llevar su stock a 0:")
+        for p in inactivos:
+            print(f" - Limpiando stock de: {p.nombre} (ID: {p.id})")
+            
+            # Poner a 0 las existencias en cada almacén para eliminar el stock fantasma
+            for stock in p.stocks:
+                stock.cantidad = 0.0
+        
+        db.session.commit()
+        print("\n¡Listo! El stock fantasma de los productos inactivos se ha puesto en 0. Las vistas de Almacenes y Balance ahora coincidirán perfectamente.")
+
+if __name__ == '__main__':
+    limpiar_stock_inactivos()

@@ -5,6 +5,8 @@ from flask_sqlalchemy import SQLAlchemy
 import time
 from datetime import datetime  # Si la usas en otras partes
 from flask import Flask, render_template, request, jsonify, redirect, url_for
+from sqlalchemy import func, case, or_
+from sqlalchemy.orm import joinedload
 
 app = Flask(__name__)
 
@@ -346,7 +348,6 @@ def vista_balance():
             ).mappings().all()
 
             for row in filas_deudas:
-                # Omitir deudas pagadas o canceladas
                 estado_str = str(row.get('estado', '')).lower()
                 if estado_str == 'pagado' or row.get('cierre_pago_id') is not None:
                     continue
@@ -364,7 +365,6 @@ def vista_balance():
                 elif prod_nom:
                     prod = Producto.query.filter(Producto.nombre.ilike(prod_nom)).first()
 
-                # Si el producto tiene socio, se le asigna a él. Si es concepto general, se asigna a Cristian.
                 if prod and prod.propietario_id == prop.id:
                     deudas_cobrar += monto_d
                 elif not prod and 'CRISTIAN' in prop.nombre.upper():
@@ -373,7 +373,11 @@ def vista_balance():
             deudas_cobrar = 0.0
 
         # 3. Préstamos Otorgados a terceros
-        prestamos = PrestamoTercero.query.filter_by(propietario_id=prop.id, estado='PENDIENTE').all()
+        prestamos = PrestamoTercero.query.filter(
+            PrestamoTercero.propietario_id == prop.id,
+            func.upper(func.trim(PrestamoTercero.estado)) == 'PENDIENTE'
+        ).all()
+        
         prestamos_efectivo = sum(p.saldo_pendiente for p in prestamos if not getattr(p, 'metodo_pago', None) or p.metodo_pago == 'EFECTIVO')
         prestamos_transf = sum(p.saldo_pendiente for p in prestamos if getattr(p, 'metodo_pago', None) == 'TRANSFERENCIA')
         total_prestamos = prestamos_efectivo + prestamos_transf
@@ -412,11 +416,9 @@ def vista_balance():
                 if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
                     transferencias_cierres += (c.total_transferencias or 0.0)
 
-        # Totales líquidos desglosados
         efectivo_liquido = max(0.0, efectivo_acumulado + inyecciones_efectivo - retiros_efectivo - prestamos_efectivo - compras_efectivo)
         transferencias_acumuladas = max(0.0, transferencias_cierres + inyecciones_transf - retiros_transf - prestamos_transf - compras_transf)
 
-        # Patrimonio Neto Total (incluye Deudas por Cobrar)
         patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + deudas_cobrar + total_prestamos
 
         balance_propietarios.append({
@@ -432,16 +434,19 @@ def vista_balance():
         })
 
     snapshots = SnapshotBalanceDiario.query.order_by(SnapshotBalanceDiario.fecha.desc()).limit(30).all()
-    prestamos_activos = PrestamoTercero.query.filter_by(estado='PENDIENTE').all()
+    
+    # IMPORTANTE: Cambiamos el nombre a 'prestamos' para que coincida exactamente con la plantilla
+    prestamos = PrestamoTercero.query.options(joinedload(PrestamoTercero.propietario)).filter(
+        func.upper(func.trim(PrestamoTercero.estado)) == 'PENDIENTE'
+    ).all()
 
     return render_template(
         'admin_balance.html',
         balance_propietarios=balance_propietarios,
         snapshots=snapshots,
-        prestamos=prestamos_activos,
+        prestamos=prestamos,  # <--- Aquí pasamos la variable con el nombre correcto
         propietarios=propietarios
     )
-
 
 @app.route('/admin/balance/guardar-snapshot', methods=['POST'])
 def guardar_snapshot_diario():
@@ -630,7 +635,7 @@ def vista_deudas():
     if 'user' not in session:
         return redirect(url_for('login'))
 
-    productos = Producto.query.all()
+    productos = Producto.query.filter(or_(Producto.activo == True, Producto.activo.is_(None))).all()
     deudas_pendientes = DeudaCierre.query.filter_by(estado='pendiente').order_by(DeudaCierre.id.desc()).all()
     deudas_cobradas = DeudaCierre.query.filter_by(estado='pagado').order_by(DeudaCierre.id.desc()).limit(20).all()
     
@@ -703,7 +708,28 @@ def guardar_deuda():
     db.session.commit()
     flash("Deuda / Fiado registrado correctamente.", "success")
     return redirect(url_for('vista_deudas'))
+@app.route('/admin/balance/prestamo/pagar/<int:id>', methods=['POST'])
+def pagar_prestamo_tercero(id):
+    if 'user' not in session or session.get('rol') != 'admin':
+        return jsonify({'success': False, 'message': 'No autorizado'}), 403
 
+    prestamo = PrestamoTercero.query.get_or_404(id)
+    data = request.json or {}
+    
+    # Permite abonar una cantidad parcial o saldar el total pendiente
+    monto_abono = float(data.get('monto', prestamo.saldo_pendiente))
+    
+    if monto_abono <= 0:
+        return jsonify({'success': False, 'message': 'El monto debe ser mayor a 0'}), 400
+        
+    if monto_abono >= prestamo.saldo_pendiente:
+        prestamo.saldo_pendiente = 0.0
+        prestamo.estado = 'PAGADO'
+    else:
+        prestamo.saldo_pendiente -= monto_abono
+        
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Préstamo amortizado correctamente'})
 
 @app.route('/deudas/cobrar/<int:id>', methods=['POST'])
 def cobrar_deuda(id):
@@ -742,7 +768,7 @@ def gestionar_propietarios():
     return render_template('admin_gestion.html', propietarios=lista_propietarios)
 
 
-@app.route('/eliminar_propietario/<int:id>')
+@app.route('/eliminar_propietario/<int:id>', methods=['POST'])
 def eliminar_propietario(id):
     if 'user' in session and session.get('rol') == 'admin':
         p = Propietario.query.get_or_404(id)
@@ -1259,6 +1285,7 @@ def guardar_producto():
             nueva_cuenta = CuentaPorPagar(
                 proveedor_id=proveedor_id,
                 producto_id=nuevo_producto.id,
+                cantidad=cantidad,
                 monto_total=monto_deuda,
                 monto_pendiente=monto_deuda,
                 fecha=datetime.now(),

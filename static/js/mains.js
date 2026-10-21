@@ -557,3 +557,93 @@ document.addEventListener('DOMContentLoaded', () => {
         calcular();
     }
 });
+// Función para imprimir la tabla limpiando elementos innecesarios
+function imprimirTabla(tituloPersonalizado = null) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'mm', 'a4');
+
+    // 1. Obtener el título de forma dinámica
+    let tituloReporte = tituloPersonalizado;
+    
+    if (!tituloReporte) {
+        // Buscar si la vista actual tiene un h1 principal (ej: "Consolidado de Almacenes")
+        const h1Pagina = document.querySelector('h1');
+        if (h1Pagina) {
+            // Limpiamos el texto por si tiene badges o etiquetas dentro (como "Administrador")
+            tituloReporte = h1Pagina.innerText.split('\n')[0].trim();
+        } else {
+            // Si no hay h1, usar el título de la pestaña o un genérico
+            tituloReporte = document.title || "Reporte del Sistema";
+        }
+    }
+
+    // Título del Reporte en el PDF
+    doc.setFontSize(16);
+    doc.setTextColor(40, 40, 40);
+    doc.text(tituloReporte, 14, 20);
+
+    // Fecha de generación
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    const fechaActual = new Date().toLocaleDateString();
+    doc.text(`Fecha de emisión: ${fechaActual}`, 14, 26);
+
+    // Capturar datos de la tabla visible en pantalla
+    const tabla = document.querySelector('table');
+    if (!tabla) {
+        alert("No se encontró ninguna tabla en esta vista para imprimir.");
+        return;
+    }
+
+    const columnas = [];
+    const filas = [];
+
+    // Obtener cabeceras (excluyendo la última columna si es la de "Acciones")
+    const ths = tabla.querySelectorAll('thead th');
+    ths.forEach((th, index) => {
+        if (index < ths.length - 1) {
+            columnas.push(th.innerText.trim());
+        }
+    });
+
+    // Obtener filas de datos (excluyendo la última columna de acciones)
+    const trs = tabla.querySelectorAll('tbody tr');
+    trs.forEach(tr => {
+        const celdas = tr.querySelectorAll('td');
+        const filaDatos = [];
+        celdas.forEach((celda, index) => {
+            if (index < celdas.length - 1) {
+                let texto = celda.innerText.trim().replace(/\s+/g, ' ');
+                filaDatos.push(texto);
+            }
+        });
+        if (filaDatos.length > 0) {
+            filas.push(filaDatos);
+        }
+    });
+
+    // Generar la tabla estilizada con AutoTable
+    doc.autoTable({
+        head: [columnas],
+        body: filas,
+        startY: 32,
+        theme: 'grid',
+        styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            textColor: [50, 50, 50]
+        },
+        headStyles: {
+            fillColor: [234, 88, 12], // Naranja institucional Tailwind (orange-600)
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        alternateRowStyles: {
+            fillColor: [248, 249, 250]
+        }
+    });
+
+    // Abrir el PDF generado en una nueva pestaña
+    window.open(doc.output('bloburl'), '_blank');
+}

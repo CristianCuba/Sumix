@@ -6,27 +6,42 @@
     <!-- Encabezado y Filtros -->
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-800 pb-4">
         <div>
-            <h2 class="text-2xl font-bold text-white tracking-tight">Cuentas por Pagar</h2>
+            <h1 class="text-2xl font-bold text-white tracking-tight">Cuentas por Pagar</h1>
             <p class="text-xs text-gray-400 mt-1">Gestión de deudas pendientes e historial de pagos</p>
         </div>
 
-        <!-- Filtro por Proveedor -->
-        <form method="GET" action="{{ url_for('cuentas_por_pagar') }}" class="flex items-center gap-3">
-            <select name="proveedor" onchange="this.form.submit()"
-                class="bg-[#121316] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 focus:border-orange-500 focus:outline-none">
-                <option value="">-- Todos los Proveedores --</option>
-                {% for proveedor in proveedores %}
-                <option value="{{ proveedor.id }}" {% if proveedor.id|string == proveedor_seleccionado %}selected{% endif %}>
-                    {{ proveedor.nombre }}
-                </option>
-                {% endfor %}
-            </select>
+        <!-- Filtros (Proveedor por URL y Buscador de Texto en Tiempo Real) -->
+        <div class="flex flex-col sm:flex-row items-center gap-3">
+            <!-- Buscador por texto en tiempo real -->
+            <div class="relative w-full sm:w-64">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                    </svg>
+                </div>
+                <input type="text" id="filtro-global-tablas" onkeyup="filtrarTablas()"
+                    placeholder="Filtrar tablas..."
+                    class="w-full pl-9 pr-4 py-2.5 bg-[#121316] border border-gray-700 text-white text-sm rounded-xl placeholder-gray-500 focus:outline-none focus:border-orange-500 transition-all">
+            </div>
 
-            <a href="{{ url_for('cuentas_por_pagar') }}"
-                class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all">
-                Limpiar
-            </a>
-        </form>
+            <!-- Filtro por Proveedor -->
+            <form method="GET" action="{{ url_for('cuentas_por_pagar') }}" class="flex items-center gap-3 w-full sm:w-auto">
+                <select name="proveedor" onchange="this.form.submit()"
+                    class="w-full sm:w-auto bg-[#121316] border border-gray-700 text-white text-sm rounded-xl px-4 py-2.5 focus:border-orange-500 focus:outline-none">
+                    <option value="">-- Todos los Proveedores --</option>
+                    {% for proveedor in proveedores %}
+                    <option value="{{ proveedor.id }}" {% if proveedor.id|string == proveedor_seleccionado %}selected{% endif %}>
+                        {{ proveedor.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+
+                <a href="{{ url_for('cuentas_por_pagar') }}"
+                    class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl text-xs font-semibold transition-all shrink-0">
+                    Limpiar
+                </a>
+            </form>
+        </div>
     </div>
 
     <!-- Tarjeta Resumen + Botón WhatsApp -->
@@ -68,6 +83,13 @@
                 </svg>
                 <span class="btn-texto">Copiar Tabla</span>
             </button>
+            <button onclick="imprimirTabla()" 
+                class="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shadow-sm">
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2n2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                </svg>
+                <span>Imprimir</span>
+            </button>
         </div>
 
         <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
@@ -80,12 +102,12 @@
                             <th class="p-4">Proveedor</th>
                             <th class="p-4 text-center">Cantidad</th>
                             <th class="p-4 text-right">Pendiente</th>
-                            <th class="p-4 text-center no-copiar">Acción</th> <!-- no-copiar evita pegar los botones -->
+                            <th class="p-4 text-center no-copiar">Acción</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-800/60 text-gray-300">
                         {% for item in cuentas %}
-                        <tr class="hover:bg-gray-800/30 transition-colors">
+                        <tr class="hover:bg-gray-800/30 transition-colors fila-buscable">
                             <!-- FECHA -->
                             <td class="p-4 font-mono text-xs text-gray-400">
                                 {% if item.fecha %}
@@ -177,7 +199,7 @@
                     </thead>
                     <tbody class="divide-y divide-gray-800/60 text-gray-300">
                         {% for h in historial %}
-                        <tr class="hover:bg-gray-800/30 transition-colors">
+                        <tr class="hover:bg-gray-800/30 transition-colors fila-buscable">
                             <td class="p-4 font-mono text-xs text-gray-400">
                                 {{ h.fecha_pago.strftime('%Y-%m-%d %H:%M') }}
                             </td>
@@ -202,8 +224,23 @@
 
 </div>
 
-<!-- Script para copiar la tabla al portapapeles -->
+<!-- Scripts de Filtrado y Utilidades -->
 <script>
+function filtrarTablas() {
+    const input = document.getElementById('filtro-global-tablas');
+    const filtro = input.value.toLowerCase().trim();
+    const filas = document.querySelectorAll('.fila-buscable');
+
+    filas.forEach(fila => {
+        const textoFila = fila.textContent.toLowerCase();
+        if (textoFila.includes(filtro)) {
+            fila.style.display = '';
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+}
+
 function copiarTabla(idTabla, boton) {
     const tabla = document.getElementById(idTabla);
     if (!tabla) return;
@@ -212,9 +249,11 @@ function copiarTabla(idTabla, boton) {
     const filas = tabla.querySelectorAll('tr');
 
     filas.forEach(fila => {
+        // Solo copia filas que estén visibles (por si hay un filtro aplicado)
+        if (fila.style.display === 'none') return;
+
         const celdas = fila.querySelectorAll('th, td');
         const filaDatos = Array.from(celdas)
-            // Filtra los elementos marcados con la clase 'no-copiar'
             .filter(celda => !celda.classList.contains('no-copiar'))
             .map(celda => celda.innerText.trim().replace(/\s+/g, ' '));
         
@@ -241,22 +280,18 @@ function copiarTabla(idTabla, boton) {
         alert('Ocurrió un error al intentar copiar la tabla.');
     });
 }
+
 function solicitarCantidad(form, cantidadDisponible) {
-    // Si solo hay 1 unidad, procesa directamente sin preguntar
     if (cantidadDisponible <= 1) {
         form.querySelector('input[name="cantidad_a_pagar"]').value = 1;
         return true;
     }
 
-    // Si hay más de 1 unidad, pregunta cuántas va a liquidar
     let respuesta = prompt(`Cantidad pendiente: ${cantidadDisponible}\n¿Cuántas unidades deseas liquidar?`, cantidadDisponible);
-    
-    // Si cancela la ventana emergente, detiene el envío
     if (respuesta === null) return false;
 
     let cantidadALiquidar = parseInt(respuesta);
 
-    // Validaciones
     if (isNaN(cantidadALiquidar) || cantidadALiquidar <= 0) {
         alert("Por favor ingresa un número válido mayor a 0.");
         return false;
@@ -267,7 +302,6 @@ function solicitarCantidad(form, cantidadDisponible) {
         return false;
     }
 
-    // Asigna la cantidad al campo oculto del formulario
     form.querySelector('input[name="cantidad_a_pagar"]').value = cantidadALiquidar;
     return true;
 }

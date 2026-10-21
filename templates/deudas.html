@@ -53,14 +53,19 @@
             </div>
 
             <div class="sm:col-span-3">
-                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Producto (Opcional)</label>
-                <select name="producto_id"
+                <label class="block text-xs font-semibold text-gray-400 uppercase mb-1">Producto ()</label>
+                <!-- Usamos el nombre del producto como valor principal para que el datalist lo reconozca al escribir -->
+                <input type="text" id="input-producto-busqueda" list="lista-productos-deudas" placeholder="Escribe para buscar..."
                     class="w-full bg-[#1a1b1e] border border-gray-700 rounded-xl p-2.5 text-white focus:border-orange-500 focus:outline-none">
-                    <option value="" selected>-- Selecciona o dejar libre --</option>
+                
+                <input type="hidden" name="producto_id" id="producto_id_oculto">
+
+                <datalist id="lista-productos-deudas">
                     {% for p in productos %}
-                    <option value="{{ p.id }}">{{ p.nombre }} (${{ "%.2f"|format(p.precio_venta) }})</option>
+                    <!-- El value es el nombre exacto, y label muestra el precio al lado para guiarte -->
+                    <option data-id="{{ p.id }}" value="{{ p.nombre }}" label=" {{ p.nombre }} Precio: ${{ '%.2f'|format(p.precio_venta) }}"></option>
                     {% endfor %}
-                </select>
+                </datalist>
             </div>
 
             <div class="sm:col-span-2">
@@ -91,7 +96,6 @@
                 <span>🔴</span> Deudas Pendientes
             </h3>
             
-            <!-- NUEVO: Input de Filtro y Subtotal de la busqueda -->
             <div class="flex items-center gap-3">
                 <div class="text-xs text-gray-400 bg-[#121316] border border-gray-800 px-3 py-2 rounded-xl">
                     Subtotal Filtrado: <span id="subtotal-filtrado" class="font-mono font-bold text-rose-400">$0.00</span>
@@ -212,18 +216,64 @@
     </div>
 </main>
 
-<!-- SCRIPT para fecha automática y filtro con cálculo de subtotal -->
+<!-- SCRIPT de soporte -->
 <script>
+
     document.addEventListener("DOMContentLoaded", function() {
-        // 1. Rellenar fecha actual
         const inputFecha = document.getElementById('fecha-deuda');
-        if (inputFecha) {
+        if (inputFecha && !inputFecha.value) {
             const hoy = new Date();
             hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
             inputFecha.value = hoy.toISOString().slice(0, 10);
         }
 
-        // 2. Lógica del Filtro y Subtotal Dinámico
+        const inputBusqueda = document.getElementById('input-producto-busqueda');
+        const inputOcultoId = document.getElementById('producto_id_oculto');
+        const datalist = document.getElementById('lista-productos-deudas');
+
+        if (inputBusqueda) {
+            inputBusqueda.addEventListener('input', function() {
+                const valorActual = this.value.trim();
+                inputOcultoId.value = "";
+
+                const opciones = datalist.querySelectorAll('option');
+                opciones.forEach(opcion => {
+                    if (opcion.value.trim() === valorActual) {
+                        inputOcultoId.value = opcion.getAttribute('data-id');
+                    }
+                });
+            });
+        }
+    });
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Rellenar fecha actual
+        const inputFecha = document.getElementById('fecha-deuda');
+        if (inputFecha && !inputFecha.value) {
+            const hoy = new Date();
+            hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
+            inputFecha.value = hoy.toISOString().slice(0, 10);
+        }
+
+        // 2. Mapear selección del Datalist con el ID real del producto
+        const inputBusqueda = document.getElementById('input-producto-busqueda');
+        const inputOcultoId = document.getElementById('producto_id_oculto');
+        const datalist = document.getElementById('lista-productos-deudas');
+
+        if (inputBusqueda) {
+            inputBusqueda.addEventListener('input', function() {
+                const valorActual = this.value.trim();
+                inputOcultoId.value = ""; // Limpiar por defecto
+
+                const opciones = datalist.querySelectorAll('option');
+                opciones.forEach(opcion => {
+                    if (opcion.value.trim() === valorActual) {
+                        inputOcultoId.value = opcion.getAttribute('data-id');
+                    }
+                });
+            });
+        }
+
+        // 3. Lógica del Filtro y Subtotal Dinámico
         const buscador = document.getElementById('buscador-deudas');
         const filas = document.querySelectorAll('.fila-deuda');
         const spanSubtotal = document.getElementById('subtotal-filtrado');
@@ -243,7 +293,6 @@
                 }
             });
 
-            // Mostrar el subtotal formateado con 2 decimales
             if (spanSubtotal) {
                 spanSubtotal.textContent = '$' + acumuladoSubtotal.toFixed(2);
             }
@@ -251,7 +300,6 @@
 
         if (buscador) {
             buscador.addEventListener('input', actualizarFiltroYSubtotal);
-            // Ejecutar al cargar para inicializar con el total completo
             actualizarFiltroYSubtotal();
         }
     });

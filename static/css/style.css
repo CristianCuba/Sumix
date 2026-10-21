@@ -1,7 +1,26 @@
 body {
     font-family: 'Inter', sans-serif;
 }
-
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    section, section * {
+        visibility: visible;
+    }
+    section {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background-color: white !important;
+        color: black !important;
+    }
+    /* Ocultar botones de acción de cada fila al imprimir */
+    td:last-child, th:last-child {
+        display: none;
+    }
+}
 /* Ocultar flechas de inputs numéricos en Chrome, Safari, Edge, Opera */
 input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
