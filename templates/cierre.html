@@ -20,7 +20,12 @@
             <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">SUMIX <span
                     class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-800 text-orange-400 border border-orange-500/20">Control
                     de Turno</span></h1>
-            <p class="text-xs text-gray-400 mt-0.5">Gestión de inventario y cuadre de caja diario</p>
+            <p class="text-xs text-gray-400 mt-0.5">
+                Gestión de inventario y cuadre de caja diario 
+                {% if session.get('user') %}
+                    | Operador: <span class="text-gray-200 font-semibold">{{ session.get('user') }}</span>
+                {% endif %}
+            </p>
         </div>
 
         <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">

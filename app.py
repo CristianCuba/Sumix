@@ -102,14 +102,17 @@ class Compra(db.Model):
     fecha = db.Column(db.DateTime, default=datetime.now)
     efectivo_inicial = db.Column(db.Float, default=0.0)
     total_compra = db.Column(db.Float, default=0.0)
+    total_confirmado = db.Column(db.Float, default=0.0)
     efectivo_restante = db.Column(db.Float, default=0.0)
-    
+    estado = db.Column(db.String(20), default='PLANIFICADA')
+
     # ⚠️ CAMPOS NUEVOS (Añadir estos dos):
     propietario_id = db.Column(db.Integer, db.ForeignKey('propietarios.id'), nullable=True)
     metodo_pago = db.Column(db.String(20), default='EFECTIVO')
 
     items = db.relationship('ItemCompra', backref='compra', lazy=True)
     propietario = db.relationship('Propietario', backref='compras')
+
 
 class ItemCompra(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -119,6 +122,8 @@ class ItemCompra(db.Model):
     cantidad = db.Column(db.Float, nullable=False)
     precio = db.Column(db.Float, nullable=False)
     subtotal = db.Column(db.Float, nullable=False)
+    estado = db.Column(db.String(20), default='PENDIENTE')
+    confirmado_en = db.Column(db.DateTime, nullable=True)
     
 class Almacen(db.Model):
     __tablename__ = 'almacenes'
@@ -327,6 +332,119 @@ def obtener_stock_total(producto):
     return getattr(producto, 'stock', 0)
 
 
+def calcular_saldos_propietario(prop, session_db=None):
+    sess = session_db or db.session
+
+    prestamos = sess.query(PrestamoTercero).filter(
+        PrestamoTercero.propietario_id == prop.id,
+        func.upper(func.trim(PrestamoTercero.estado)) == 'PENDIENTE'
+    ).all()
+
+    prestamos_efectivo = sum(
+        float(p.saldo_pendiente or 0.0)
+        for p in prestamos
+        if not getattr(p, 'metodo_pago', None) or p.metodo_pago == 'EFECTIVO'
+    )
+    prestamos_transf = sum(
+        float(p.saldo_pendiente or 0.0)
+        for p in prestamos
+        if getattr(p, 'metodo_pago', None) == 'TRANSFERENCIA'
+    )
+
+    movs = sess.query(MovimientoCapital).filter_by(propietario_id=prop.id).all()
+    inyecciones_efectivo = sum(
+        float(m.monto or 0.0)
+        for m in movs
+        if m.tipo == 'INYECCION' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO')
+    )
+    retiros_efectivo = sum(
+        float(m.monto or 0.0)
+        for m in movs
+        if m.tipo == 'RETIRO' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO')
+    )
+
+    inyecciones_transf = sum(
+        float(m.monto or 0.0)
+        for m in movs
+        if m.tipo == 'INYECCION' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA'
+    )
+    retiros_transf = sum(
+        float(m.monto or 0.0)
+        for m in movs
+        if m.tipo == 'RETIRO' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA'
+    )
+
+    compras_socio = sess.query(Compra).filter_by(propietario_id=prop.id).all() if 'Compra' in globals() else []
+
+    def _monto_confirmado_compra(c):
+        # Si la compra tiene ítems con estado explícito, suma solo los CONFIRMADO;
+        # de lo contrario usa total_confirmado (o total_compra si es una compra legacy sin estados).
+        items = getattr(c, 'items', None) or []
+        con_estado = [i for i in items if getattr(i, 'estado', None)]
+        if con_estado:
+            return sum(
+                float(i.subtotal or 0.0)
+                for i in items
+                if (getattr(i, 'estado', None) or '').upper() == 'CONFIRMADO'
+            )
+        total_conf = getattr(c, 'total_confirmado', None)
+        if total_conf is not None and float(total_conf or 0.0) > 0:
+            return float(total_conf)
+        estado_c = (getattr(c, 'estado', None) or '').upper()
+        if estado_c == 'PLANIFICADA':
+            return 0.0
+        return float(c.total_compra or 0.0)
+
+    compras_efectivo = sum(
+        _monto_confirmado_compra(c)
+        for c in compras_socio
+        if getattr(c, 'metodo_pago', None) == 'EFECTIVO' or not getattr(c, 'metodo_pago', None)
+    )
+    compras_transf = sum(
+        _monto_confirmado_compra(c)
+        for c in compras_socio
+        if getattr(c, 'metodo_pago', None) == 'TRANSFERENCIA'
+    )
+
+    efectivo_acumulado = 0.0
+    transferencias_cierres = 0.0
+    es_cristian = 'CRISTIAN' in (prop.nombre or '').upper()
+
+    if 'CierreDia' in globals():
+        cierres = sess.query(CierreDia).all()
+        for c in cierres:
+            if hasattr(c, 'detalles'):
+                for d in c.detalles:
+                    prod = sess.get(Producto, d.producto_id) if hasattr(sess, 'get') else Producto.query.get(d.producto_id)
+                    if prod and prod.propietario_id == prop.id:
+                        efectivo_acumulado += float(d.subtotal or 0.0)
+
+            if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
+                transferencias_cierres += float(c.total_transferencias or 0.0)
+
+    efectivo_liquido = max(
+        0.0,
+        efectivo_acumulado + inyecciones_efectivo - retiros_efectivo - prestamos_efectivo - compras_efectivo
+    )
+    transferencias_acumuladas = max(
+        0.0,
+        transferencias_cierres + inyecciones_transf - retiros_transf - prestamos_transf - compras_transf
+    )
+
+    return {
+        'efectivo': efectivo_liquido,
+        'transferencia': transferencias_acumuladas,
+        'prestamos_efectivo': prestamos_efectivo,
+        'prestamos_transf': prestamos_transf,
+        'total_prestamos': prestamos_efectivo + prestamos_transf,
+        'inyecciones_efectivo': inyecciones_efectivo,
+        'retiros_efectivo': retiros_efectivo,
+        'inyecciones_transf': inyecciones_transf,
+        'retiros_transf': retiros_transf,
+        'total_inyecciones': inyecciones_efectivo + inyecciones_transf,
+        'total_retiros': retiros_efectivo + retiros_transf,
+    }
+
 @app.route('/admin/balance')
 def vista_balance():
     if 'user' not in session or session.get('rol') != 'admin':
@@ -344,12 +462,12 @@ def vista_balance():
         deudas_cobrar = 0.0
         try:
             filas_deudas = db.session.execute(
-                db.text("SELECT * FROM deudas_cierre WHERE LOWER(COALESCE(estado, '')) = 'pendiente' OR cierre_pago_id IS NULL")
+                db.text("SELECT * FROM deudas_cierre WHERE LOWER(COALESCE(estado, '')) = 'pendiente'")
             ).mappings().all()
 
             for row in filas_deudas:
                 estado_str = str(row.get('estado', '')).lower()
-                if estado_str == 'pagado' or row.get('cierre_pago_id') is not None:
+                if estado_str == 'pagado':
                     continue
 
                 monto_d = float(row.get('subtotal') or 0.0)
@@ -372,52 +490,13 @@ def vista_balance():
         except Exception:
             deudas_cobrar = 0.0
 
-        # 3. Préstamos Otorgados a terceros
-        prestamos = PrestamoTercero.query.filter(
-            PrestamoTercero.propietario_id == prop.id,
-            func.upper(func.trim(PrestamoTercero.estado)) == 'PENDIENTE'
-        ).all()
-        
-        prestamos_efectivo = sum(p.saldo_pendiente for p in prestamos if not getattr(p, 'metodo_pago', None) or p.metodo_pago == 'EFECTIVO')
-        prestamos_transf = sum(p.saldo_pendiente for p in prestamos if getattr(p, 'metodo_pago', None) == 'TRANSFERENCIA')
-        total_prestamos = prestamos_efectivo + prestamos_transf
-
-        # 4. Movimientos de Capital (Inyecciones / Retiros)
-        movs = MovimientoCapital.query.filter_by(propietario_id=prop.id).all()
-
-        inyecciones_efectivo = sum(m.monto for m in movs if m.tipo == 'INYECCION' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO'))
-        retiros_efectivo = sum(m.monto for m in movs if m.tipo == 'RETIRO' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO'))
-
-        inyecciones_transf = sum(m.monto for m in movs if m.tipo == 'INYECCION' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA')
-        retiros_transf = sum(m.monto for m in movs if m.tipo == 'RETIRO' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA')
-
-        total_inyecciones = inyecciones_efectivo + inyecciones_transf
-        total_retiros = retiros_efectivo + retiros_transf
-
-        # 5. Compras realizadas por este socio
-        compras_socio = Compra.query.filter_by(propietario_id=prop.id).all() if 'Compra' in globals() else []
-        compras_efectivo = sum(c.total_compra for c in compras_socio if c.metodo_pago == 'EFECTIVO' or not c.metodo_pago)
-        compras_transf = sum(c.total_compra for c in compras_socio if c.metodo_pago == 'TRANSFERENCIA')
-
-        # 6. Cierres de Venta y Transferencias acumuladas
-        efectivo_acumulado = 0.0
-        transferencias_cierres = 0.0
-        es_cristian = 'CRISTIAN' in prop.nombre.upper()
-
-        if 'CierreDia' in globals():
-            cierres = CierreDia.query.all()
-            for c in cierres:
-                if hasattr(c, 'detalles'):
-                    for d in c.detalles:
-                        prod = Producto.query.get(d.producto_id)
-                        if prod and prod.propietario_id == prop.id:
-                            efectivo_acumulado += (d.subtotal or 0.0)
-
-                if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
-                    transferencias_cierres += (c.total_transferencias or 0.0)
-
-        efectivo_liquido = max(0.0, efectivo_acumulado + inyecciones_efectivo - retiros_efectivo - prestamos_efectivo - compras_efectivo)
-        transferencias_acumuladas = max(0.0, transferencias_cierres + inyecciones_transf - retiros_transf - prestamos_transf - compras_transf)
+        # 3 al 6. Saldos líquidos y movimientos calculados de forma unificada
+        saldos = calcular_saldos_propietario(prop, session_db=db.session)
+        efectivo_liquido = saldos['efectivo']
+        transferencias_acumuladas = saldos['transferencia']
+        total_prestamos = saldos['total_prestamos']
+        total_inyecciones = saldos['total_inyecciones']
+        total_retiros = saldos['total_retiros']
 
         patrimonio_total = efectivo_liquido + transferencias_acumuladas + inventario_costo + deudas_cobrar + total_prestamos
 
@@ -434,7 +513,7 @@ def vista_balance():
         })
 
     snapshots = SnapshotBalanceDiario.query.order_by(SnapshotBalanceDiario.fecha.desc()).limit(30).all()
-    
+
     # IMPORTANTE: Cambiamos el nombre a 'prestamos' para que coincida exactamente con la plantilla
     prestamos = PrestamoTercero.query.options(joinedload(PrestamoTercero.propietario)).filter(
         func.upper(func.trim(PrestamoTercero.estado)) == 'PENDIENTE'
@@ -444,7 +523,7 @@ def vista_balance():
         'admin_balance.html',
         balance_propietarios=balance_propietarios,
         snapshots=snapshots,
-        prestamos=prestamos,  # <--- Aquí pasamos la variable con el nombre correcto
+        prestamos=prestamos,
         propietarios=propietarios
     )
 
@@ -467,12 +546,12 @@ def guardar_snapshot_diario():
             deudas_cobrar = 0.0
             try:
                 filas_deudas = db.session.execute(
-                    db.text("SELECT * FROM deudas_cierre WHERE LOWER(COALESCE(estado, '')) = 'pendiente' OR cierre_pago_id IS NULL")
+                    db.text("SELECT * FROM deudas_cierre WHERE LOWER(COALESCE(estado, '')) = 'pendiente'")
                 ).mappings().all()
 
                 for row in filas_deudas:
                     estado_str = str(row.get('estado', '')).lower()
-                    if estado_str == 'pagado' or row.get('cierre_pago_id') is not None:
+                    if estado_str == 'pagado':
                         continue
 
                     monto_d = float(row.get('subtotal') or 0.0)
@@ -737,10 +816,46 @@ def cobrar_deuda(id):
         return redirect(url_for('login'))
 
     deuda = DeudaCierre.query.get_or_404(id)
-    deuda.estado = 'pagado'
+    if deuda.estado == 'pagado':
+        flash(f"La deuda de '{deuda.concepto}' ya estaba cobrada.", "info")
+        return redirect(url_for('vista_deudas'))
 
-    db.session.commit()
-    flash(f"Deuda de '{deuda.concepto}' marcada como cobrada.", "success")
+    try:
+        deuda.estado = 'pagado'
+        monto_cobrado = float(deuda.subtotal or 0.0)
+
+        if monto_cobrado > 0:
+            prop_id = None
+            if deuda.producto_id and deuda.producto_id > 0:
+                prod = Producto.query.get(deuda.producto_id)
+                if prod:
+                    prop_id = prod.propietario_id
+            elif deuda.producto_nombre:
+                prod = Producto.query.filter(Producto.nombre.ilike(deuda.producto_nombre.strip())).first()
+                if prod:
+                    prop_id = prod.propietario_id
+
+            if not prop_id:
+                prop_cristian = Propietario.query.filter(Propietario.nombre.ilike('%cristian%')).first()
+                if prop_cristian:
+                    prop_id = prop_cristian.id
+
+            if prop_id:
+                mov_cobro = MovimientoCapital(
+                    propietario_id=prop_id,
+                    tipo='INYECCION',
+                    monto=monto_cobrado,
+                    metodo_pago='EFECTIVO',
+                    concepto=f"Cobro deuda #{deuda.id} - {deuda.concepto}"
+                )
+                db.session.add(mov_cobro)
+
+        db.session.commit()
+        flash(f"Deuda de '{deuda.concepto}' marcada como cobrada.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al cobrar la deuda: {str(e)}", "danger")
+
     return redirect(url_for('vista_deudas'))
 
 @app.route('/api/tipos_operacion', methods=['GET'])
