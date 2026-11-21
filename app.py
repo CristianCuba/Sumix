@@ -332,118 +332,159 @@ def obtener_stock_total(producto):
     return getattr(producto, 'stock', 0)
 
 
+def _efectivo_cierre_propietario(cierre, prop_id, session_db):
+  """Distribuye el efectivo real del cierre según la participación de venta bruta del propietario."""
+  detalles = getattr(cierre, "detalles", None) or []
+  total_bruto = sum(float(d.subtotal or 0.0) for d in detalles)
+  if total_bruto <= 0:
+    return 0.0
+
+  subtotal_prop = 0.0
+  for d in detalles:
+    d_prop_id = getattr(d, "propietario_id", None)
+    if not d_prop_id and d.producto_id:
+      prod = session_db.get(Producto, d.producto_id)
+      d_prop_id = prod.propietario_id if prod else None
+    if d_prop_id == prop_id:
+      subtotal_prop += float(d.subtotal or 0.0)
+
+  if subtotal_prop <= 0:
+    return 0.0
+
+  proporcion = subtotal_prop / total_bruto
+  efectivo_real_cierre = float(cierre.efectivo_caja or 0.0)
+  if efectivo_real_cierre <= 0 and float(cierre.total_esperado or 0.0) > 0:
+    efectivo_real_cierre = float(cierre.total_esperado or 0.0)
+
+  return efectivo_real_cierre * proporcion
+
+
 def calcular_saldos_propietario(prop, session_db=None):
-    sess = session_db or db.session
+  sess = session_db or db.session
 
-    prestamos = sess.query(PrestamoTercero).filter(
-        PrestamoTercero.propietario_id == prop.id,
-        func.upper(func.trim(PrestamoTercero.estado)) == 'PENDIENTE'
-    ).all()
+  prestamos = (
+      sess.query(PrestamoTercero)
+      .filter(
+          PrestamoTercero.propietario_id == prop.id,
+          func.upper(func.trim(PrestamoTercero.estado)) == "PENDIENTE",
+      )
+      .all()
+  )
 
-    prestamos_efectivo = sum(
-        float(p.saldo_pendiente or 0.0)
-        for p in prestamos
-        if not getattr(p, 'metodo_pago', None) or p.metodo_pago == 'EFECTIVO'
-    )
-    prestamos_transf = sum(
-        float(p.saldo_pendiente or 0.0)
-        for p in prestamos
-        if getattr(p, 'metodo_pago', None) == 'TRANSFERENCIA'
-    )
+  prestamos_efectivo = sum(
+      float(p.saldo_pendiente or 0.0)
+      for p in prestamos
+      if not getattr(p, "metodo_pago", None) or p.metodo_pago == "EFECTIVO"
+  )
+  prestamos_transf = sum(
+      float(p.saldo_pendiente or 0.0)
+      for p in prestamos
+      if getattr(p, "metodo_pago", None) == "TRANSFERENCIA"
+  )
 
-    movs = sess.query(MovimientoCapital).filter_by(propietario_id=prop.id).all()
-    inyecciones_efectivo = sum(
-        float(m.monto or 0.0)
-        for m in movs
-        if m.tipo == 'INYECCION' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO')
-    )
-    retiros_efectivo = sum(
-        float(m.monto or 0.0)
-        for m in movs
-        if m.tipo == 'RETIRO' and (not getattr(m, 'metodo_pago', None) or m.metodo_pago == 'EFECTIVO')
-    )
+  movs = sess.query(MovimientoCapital).filter_by(propietario_id=prop.id).all()
+  inyecciones_efectivo = sum(
+      float(m.monto or 0.0)
+      for m in movs
+      if m.tipo == "INYECCION"
+      and (not getattr(m, "metodo_pago", None) or m.metodo_pago == "EFECTIVO")
+  )
+  retiros_efectivo = sum(
+      float(m.monto or 0.0)
+      for m in movs
+      if m.tipo == "RETIRO"
+      and (not getattr(m, "metodo_pago", None) or m.metodo_pago == "EFECTIVO")
+  )
 
-    inyecciones_transf = sum(
-        float(m.monto or 0.0)
-        for m in movs
-        if m.tipo == 'INYECCION' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA'
-    )
-    retiros_transf = sum(
-        float(m.monto or 0.0)
-        for m in movs
-        if m.tipo == 'RETIRO' and getattr(m, 'metodo_pago', None) == 'TRANSFERENCIA'
-    )
+  inyecciones_transf = sum(
+      float(m.monto or 0.0)
+      for m in movs
+      if m.tipo == "INYECCION"
+      and getattr(m, "metodo_pago", None) == "TRANSFERENCIA"
+  )
+  retiros_transf = sum(
+      float(m.monto or 0.0)
+      for m in movs
+      if m.tipo == "RETIRO"
+      and getattr(m, "metodo_pago", None) == "TRANSFERENCIA"
+  )
 
-    compras_socio = sess.query(Compra).filter_by(propietario_id=prop.id).all() if 'Compra' in globals() else []
+  compras_socio = (
+      sess.query(Compra).filter_by(propietario_id=prop.id).all()
+      if "Compra" in globals()
+      else []
+  )
 
-    def _monto_confirmado_compra(c):
-        # Si la compra tiene ítems con estado explícito, suma solo los CONFIRMADO;
-        # de lo contrario usa total_confirmado (o total_compra si es una compra legacy sin estados).
-        items = getattr(c, 'items', None) or []
-        con_estado = [i for i in items if getattr(i, 'estado', None)]
-        if con_estado:
-            return sum(
-                float(i.subtotal or 0.0)
-                for i in items
-                if (getattr(i, 'estado', None) or '').upper() == 'CONFIRMADO'
-            )
-        total_conf = getattr(c, 'total_confirmado', None)
-        if total_conf is not None and float(total_conf or 0.0) > 0:
-            return float(total_conf)
-        estado_c = (getattr(c, 'estado', None) or '').upper()
-        if estado_c == 'PLANIFICADA':
-            return 0.0
-        return float(c.total_compra or 0.0)
+  def _monto_confirmado_compra(c):
+    items = getattr(c, "items", None) or []
+    con_estado = [i for i in items if getattr(i, "estado", None)]
+    if con_estado:
+      return sum(
+          float(i.subtotal or 0.0)
+          for i in items
+          if (getattr(i, "estado", None) or "").upper() == "CONFIRMADO"
+      )
+    total_conf = getattr(c, "total_confirmado", None)
+    if total_conf is not None and float(total_conf or 0.0) > 0:
+      return float(total_conf)
+    estado_c = (getattr(c, "estado", None) or "").upper()
+    if estado_c == "PLANIFICADA":
+      return 0.0
+    return float(c.total_compra or 0.0)
 
-    compras_efectivo = sum(
-        _monto_confirmado_compra(c)
-        for c in compras_socio
-        if getattr(c, 'metodo_pago', None) == 'EFECTIVO' or not getattr(c, 'metodo_pago', None)
-    )
-    compras_transf = sum(
-        _monto_confirmado_compra(c)
-        for c in compras_socio
-        if getattr(c, 'metodo_pago', None) == 'TRANSFERENCIA'
-    )
+  compras_efectivo = sum(
+      _monto_confirmado_compra(c)
+      for c in compras_socio
+      if getattr(c, "metodo_pago", None) == "EFECTIVO"
+      or not getattr(c, "metodo_pago", None)
+  )
+  compras_transf = sum(
+      _monto_confirmado_compra(c)
+      for c in compras_socio
+      if getattr(c, "metodo_pago", None) == "TRANSFERENCIA"
+  )
 
-    efectivo_acumulado = 0.0
-    transferencias_cierres = 0.0
-    es_cristian = 'CRISTIAN' in (prop.nombre or '').upper()
+  efectivo_acumulado = 0.0
+  transferencias_cierres = 0.0
+  es_cristian = "CRISTIAN" in (prop.nombre or "").upper()
 
-    if 'CierreDia' in globals():
-        cierres = sess.query(CierreDia).all()
-        for c in cierres:
-            if hasattr(c, 'detalles'):
-                for d in c.detalles:
-                    prod = sess.get(Producto, d.producto_id) if hasattr(sess, 'get') else Producto.query.get(d.producto_id)
-                    if prod and prod.propietario_id == prop.id:
-                        efectivo_acumulado += float(d.subtotal or 0.0)
+  if "CierreDia" in globals():
+    cierres = sess.query(CierreDia).all()
+    for c in cierres:
+      efectivo_acumulado += _efectivo_cierre_propietario(c, prop.id, sess)
+      if es_cristian and getattr(c, "total_transferencias", None):
+        transferencias_cierres += float(c.total_transferencias or 0.0)
 
-            if es_cristian and hasattr(c, 'total_transferencias') and c.total_transferencias:
-                transferencias_cierres += float(c.total_transferencias or 0.0)
+  efectivo_liquido = max(
+      0.0,
+      efectivo_acumulado
+      + inyecciones_efectivo
+      - retiros_efectivo
+      - prestamos_efectivo
+      - compras_efectivo,
+  )
+  transferencias_acumuladas = max(
+      0.0,
+      transferencias_cierres
+      + inyecciones_transf
+      - retiros_transf
+      - prestamos_transf
+      - compras_transf,
+  )
 
-    efectivo_liquido = max(
-        0.0,
-        efectivo_acumulado + inyecciones_efectivo - retiros_efectivo - prestamos_efectivo - compras_efectivo
-    )
-    transferencias_acumuladas = max(
-        0.0,
-        transferencias_cierres + inyecciones_transf - retiros_transf - prestamos_transf - compras_transf
-    )
-
-    return {
-        'efectivo': efectivo_liquido,
-        'transferencia': transferencias_acumuladas,
-        'prestamos_efectivo': prestamos_efectivo,
-        'prestamos_transf': prestamos_transf,
-        'total_prestamos': prestamos_efectivo + prestamos_transf,
-        'inyecciones_efectivo': inyecciones_efectivo,
-        'retiros_efectivo': retiros_efectivo,
-        'inyecciones_transf': inyecciones_transf,
-        'retiros_transf': retiros_transf,
-        'total_inyecciones': inyecciones_efectivo + inyecciones_transf,
-        'total_retiros': retiros_efectivo + retiros_transf,
-    }
+  return {
+      "efectivo": efectivo_liquido,
+      "transferencia": transferencias_acumuladas,
+      "prestamos_efectivo": prestamos_efectivo,
+      "prestamos_transf": prestamos_transf,
+      "total_prestamos": prestamos_efectivo + prestamos_transf,
+      "inyecciones_efectivo": inyecciones_efectivo,
+      "retiros_efectivo": retiros_efectivo,
+      "inyecciones_transf": inyecciones_transf,
+      "retiros_transf": retiros_transf,
+      "total_inyecciones": inyecciones_efectivo + inyecciones_transf,
+      "total_retiros": retiros_efectivo + retiros_transf,
+  }
 
 @app.route('/admin/balance')
 def vista_balance():
@@ -1613,137 +1654,176 @@ from sqlalchemy import or_
 
 @app.route('/admin/cierres')
 def vista_reporte_cierres():
-    if 'user' not in session or session.get('rol') != 'admin':
-        return redirect(url_for('login'))
+  if 'user' not in session or session.get('rol') != 'admin':
+    return redirect(url_for('login'))
 
-    fecha_inicio_str = request.args.get('fecha_inicio')
-    fecha_fin_str = request.args.get('fecha_fin')
-    propietario_id = request.args.get('propietario_id')
-    proveedor_id = request.args.get('proveedor_id')
+  fecha_inicio_str = request.args.get('fecha_inicio')
+  fecha_fin_str = request.args.get('fecha_fin')
+  propietario_id = request.args.get('propietario_id')
+  proveedor_id = request.args.get('proveedor_id')
 
-    query = CierreDia.query
+  query = CierreDia.query
 
-    # 1. Filtro en Base de Datos adaptado para soportar historial congelado
-    if propietario_id or proveedor_id:
-        query = query.join(DetalleCierre)
-        if propietario_id:
-            query = query.filter(
-                or_(
-                    DetalleCierre.propietario_id == int(propietario_id),
-                    DetalleCierre.producto.has(Producto.propietario_id == int(propietario_id))
-                )
-            )
-        if proveedor_id:
-            query = query.filter(
-                or_(
-                    DetalleCierre.proveedor_id == int(proveedor_id),
-                    DetalleCierre.producto.has(Producto.proveedor_id == int(proveedor_id))
-                )
-            )
-
-    # 2. Filtro de Fechas
-    if fecha_inicio_str and fecha_fin_str:
-        fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
-        fecha_fin = datetime.strptime(fecha_fin_str + ' 23:59:59', '%Y-%m-%d %H:%M:%S')
-        query = query.filter(CierreDia.fecha >= fecha_inicio, CierreDia.fecha <= fecha_fin)
-
-    cierres = query.distinct().order_by(CierreDia.fecha.desc()).all()
-
-    # 3. Construcción del Resumen
-    resumen = {
-        'total_esperado': 0,
-        'total_transferencias': 0,
-        'efectivo_caja': 0,
-        'total_deudas': 0, 
-        'diferencia': 0,
-        'subtotal_filtrado': 0, 
-        'costo_filtrado': 0,
-        'ganancia_filtrada': 0,
-        'productos': {} 
-    }
-
-    for c in cierres:
-        resumen['total_esperado'] += c.total_esperado
-        resumen['total_transferencias'] += c.total_transferencias
-        resumen['efectivo_caja'] += c.efectivo_caja
-        resumen['total_deudas'] += c.total_deudas
-        resumen['diferencia'] += c.diferencia
-
-        for d in c.detalles:
-            # Obtener ID de propietario y proveedor (de la foto congelada o fallback al producto)
-            d_prop_id = getattr(d, 'propietario_id', None) or (d.producto.propietario_id if d.producto else None)
-            d_prov_id = getattr(d, 'proveedor_id', None) or (d.producto.proveedor_id if d.producto else None)
-
-            if propietario_id and str(d_prop_id) != str(propietario_id):
-                continue
-            if proveedor_id and str(d_prov_id) != str(proveedor_id):
-                continue
-
-            # Priorizar precio_costo congelado en el detalle 'd'
-            precio_costo_unitario = d.precio_costo if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0) else (d.producto.precio_costo if d.producto else 0.0)
-            precio_venta_unitario = d.precio_venta if (hasattr(d, 'precio_venta') and d.precio_venta is not None) else (d.producto.precio_venta if d.producto else 0.0)
-            
-            costo_total_item = d.vendidos * precio_costo_unitario
-            ganancia_item = d.subtotal - costo_total_item
-
-            nombre = d.nombre_producto
-            if nombre not in resumen['productos']:
-                resumen['productos'][nombre] = {
-                    'vendidos': 0, 
-                    'subtotal': 0.0,
-                    'costo': 0.0,
-                    'ganancia': 0.0,
-                    'precio_costo': precio_costo_unitario,
-                    'precio_venta': precio_venta_unitario
-                }
-            
-            resumen['productos'][nombre]['vendidos'] += d.vendidos
-            resumen['productos'][nombre]['subtotal'] += d.subtotal
-            resumen['productos'][nombre]['costo'] += costo_total_item
-            resumen['productos'][nombre]['ganancia'] += ganancia_item
-
-            resumen['subtotal_filtrado'] += d.subtotal
-            resumen['costo_filtrado'] += costo_total_item
-            resumen['ganancia_filtrada'] += ganancia_item
-
-    propietarios_list = Propietario.query.all()
-    proveedores_list = Proveedor.query.all()
-
-    proveedor_seleccionado = None
-    whatsapp_url = ""
-    
+  # 1. Filtro en Base de Datos adaptado para soportar historial congelado
+  if propietario_id or proveedor_id:
+    query = query.join(DetalleCierre)
+    if propietario_id:
+      query = query.filter(
+          or_(
+              DetalleCierre.propietario_id == int(propietario_id),
+              DetalleCierre.producto.has(
+                  Producto.propietario_id == int(propietario_id)
+              ),
+          )
+      )
     if proveedor_id:
-        proveedor_seleccionado = Proveedor.query.get(proveedor_id)
-        
-        if proveedor_seleccionado:
-            lineas_msg = [f"Hola *{proveedor_seleccionado.nombre}*, este es el reporte de los productos vendidos:"]
-            lineas_msg.append("-----------------------------")
-            
-            for nombre, datos in resumen['productos'].items():
-                if datos['vendidos'] > 0:
-                    lineas_msg.append(f"▪ {nombre}: {datos['vendidos']} uds x ${datos['precio_costo']:,.2f} = ${datos['costo']:,.2f}")
-            
-            lineas_msg.append("-----------------------------")
-            lineas_msg.append(f"*TOTAL A PAGAR:* ${resumen['costo_filtrado']:,.2f}")
-            
-            texto_codificado = urllib.parse.quote("\n".join(lineas_msg))
-            telefono = (proveedor_seleccionado.telefono or "").replace(" ", "").replace("+", "")
-            
-            if telefono:
-                whatsapp_url = f"https://wa.me/{telefono}?text={texto_codificado}"
-            else:
-                whatsapp_url = f"https://api.whatsapp.com/send?text={texto_codificado}"
-    
-    return render_template('admin_cierres.html', 
-                           cierres=cierres, 
-                           resumen=resumen,
-                           fecha_inicio=fecha_inicio_str, 
-                           fecha_fin=fecha_fin_str,
-                           propietario_id=propietario_id,
-                           proveedor_id=proveedor_id,
-                           propietarios=propietarios_list,
-                           proveedores=proveedores_list,
-                           whatsapp_url=whatsapp_url)
+      query = query.filter(
+          or_(
+              DetalleCierre.proveedor_id == int(proveedor_id),
+              DetalleCierre.producto.has(
+                  Producto.proveedor_id == int(proveedor_id)
+              ),
+          )
+      )
+
+  # 2. Filtro de Fechas
+  if fecha_inicio_str and fecha_fin_str:
+    fecha_inicio = datetime.strptime(fecha_inicio_str, '%Y-%m-%d')
+    fecha_fin = datetime.strptime(
+        fecha_fin_str + ' 23:59:59', '%Y-%m-%d %H:%M:%S'
+    )
+    query = query.filter(
+        CierreDia.fecha >= fecha_inicio, CierreDia.fecha <= fecha_fin
+    )
+
+  cierres = query.distinct().order_by(CierreDia.fecha.desc()).all()
+
+  # 3. Construcción del Resumen
+  resumen = {
+      'total_esperado': 0,
+      'total_transferencias': 0,
+      'efectivo_caja': 0,
+      'total_deudas': 0,
+      'diferencia': 0,
+      'subtotal_filtrado': 0,
+      'costo_filtrado': 0,
+      'ganancia_filtrada': 0,
+      'productos': {},
+  }
+
+  for c in cierres:
+    resumen['total_esperado'] += c.total_esperado
+    resumen['total_transferencias'] += c.total_transferencias
+    resumen['efectivo_caja'] += c.efectivo_caja
+    resumen['total_deudas'] += c.total_deudas
+    resumen['diferencia'] += c.diferencia
+
+    for d in c.detalles:
+      # Obtener ID de propietario y proveedor (de la foto congelada o fallback al producto)
+      d_prop_id = getattr(d, 'propietario_id', None) or (
+          d.producto.propietario_id if d.producto else None
+      )
+      d_prov_id = getattr(d, 'proveedor_id', None) or (
+          d.producto.proveedor_id if d.producto else None
+      )
+
+      if propietario_id and str(d_prop_id) != str(propietario_id):
+        continue
+      if proveedor_id and str(d_prov_id) != str(proveedor_id):
+        continue
+
+      # Priorizar precio_costo congelado en el detalle 'd'
+      precio_costo_unitario = (
+          d.precio_costo
+          if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0)
+          else (d.producto.precio_costo if d.producto else 0.0)
+      )
+      precio_venta_unitario = (
+          d.precio_venta
+          if (hasattr(d, 'precio_venta') and d.precio_venta is not None)
+          else (d.producto.precio_venta if d.producto else 0.0)
+      )
+
+      costo_total_item = d.vendidos * precio_costo_unitario
+      ganancia_item = d.subtotal - costo_total_item
+
+      nombre = d.nombre_producto
+      if nombre not in resumen['productos']:
+        resumen['productos'][nombre] = {
+            'vendidos': 0,
+            'subtotal': 0.0,
+            'costo': 0.0,
+            'ganancia': 0.0,
+            'precio_costo': precio_costo_unitario,
+            'precio_venta': precio_venta_unitario,
+        }
+
+      resumen['productos'][nombre]['vendidos'] += d.vendidos
+      resumen['productos'][nombre]['subtotal'] += d.subtotal
+      resumen['productos'][nombre]['costo'] += costo_total_item
+      resumen['productos'][nombre]['ganancia'] += ganancia_item
+
+      if resumen['productos'][nombre]['vendidos'] > 0:
+        resumen['productos'][nombre]['precio_venta'] = (
+            resumen['productos'][nombre]['subtotal']
+            / resumen['productos'][nombre]['vendidos']
+        )
+
+      resumen['subtotal_filtrado'] += d.subtotal
+      resumen['costo_filtrado'] += costo_total_item
+      resumen['ganancia_filtrada'] += ganancia_item
+
+  propietarios_list = Propietario.query.all()
+  proveedores_list = Proveedor.query.all()
+
+  proveedor_seleccionado = None
+  whatsapp_url = ''
+
+  if proveedor_id:
+    proveedor_seleccionado = Proveedor.query.get(proveedor_id)
+
+    if proveedor_seleccionado:
+      lineas_msg = [
+          f'Hola *{proveedor_seleccionado.nombre}*, este es el reporte de los'
+          ' productos vendidos:'
+      ]
+      lineas_msg.append('-----------------------------')
+
+      for nombre, datos in resumen['productos'].items():
+        if datos['vendidos'] > 0:
+          lineas_msg.append(
+              f"▪ {nombre}: {datos['vendidos']} uds x"
+              f" ${datos['precio_costo']:,.2f} = ${datos['costo']:,.2f}"
+          )
+
+      lineas_msg.append('-----------------------------')
+      lineas_msg.append(f"*TOTAL A PAGAR:* ${resumen['costo_filtrado']:,.2f}")
+
+      texto_codificado = urllib.parse.quote('\n'.join(lineas_msg))
+      telefono = (
+          (proveedor_seleccionado.telefono or '')
+          .replace(' ', '')
+          .replace('+', '')
+      )
+
+      if telefono:
+        whatsapp_url = f'https://wa.me/{telefono}?text={texto_codificado}'
+      else:
+        whatsapp_url = f'https://api.whatsapp.com/send?text={texto_codificado}'
+
+  return render_template(
+      'admin_cierres.html',
+      cierres=cierres,
+      resumen=resumen,
+      fecha_inicio=fecha_inicio_str,
+      fecha_fin=fecha_fin_str,
+      propietario_id=propietario_id,
+      proveedor_id=proveedor_id,
+      propietarios=propietarios_list,
+      proveedores=proveedores_list,
+      whatsapp_url=whatsapp_url,
+  )
+
 
 @app.route('/admin/cierres/<int:id_cierre>/detalle')
 def obtener_detalle_cierre(id_cierre):

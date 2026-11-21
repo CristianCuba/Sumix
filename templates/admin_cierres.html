@@ -80,7 +80,7 @@
             </div>
         </div>
 
-        {% if propietario_id or proveedor_id %}
+        {% if fecha_inicio or propietario_id or proveedor_id %}
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
             <div class="bg-[#1a1b1e] border border-orange-600/50 p-4 rounded-xl relative overflow-hidden">
                 <div class="absolute -right-4 -top-4 w-16 h-16 bg-orange-600/10 rounded-full blur-xl"></div>
@@ -164,6 +164,7 @@
                     <th class="pb-2 text-right">Costo Total</th>
                     <th class="pb-2 text-right">Precio Venta U.</th> <!-- NUEVA COLUMNA -->
                     <th class="pb-2 text-right">Importe Venta</th>   <!-- NUEVA COLUMNA -->
+                    <th class="pb-2 text-right">Ganancia</th>   <!-- NUEVA COLUMNA -->
                 </tr>
             </thead>
             <tbody>
@@ -182,6 +183,9 @@
                     </td>
                     <td class="py-3 text-right font-semibold text-emerald-400 font-mono">
                         ${{ "{:,.2f}".format(datos.subtotal) }}
+                    </td>
+                    <td class="py-3 text-right font-semibold text-amber-400 font-mono">
+                        ${{ "{:,.2f}".format(datos.ganancia) }}
                     </td>
                 </tr>
                 {% endfor %}
