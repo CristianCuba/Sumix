@@ -1,204 +1,279 @@
 {% extends "base.html" %}
 
 {% block content %}
-<main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+<main class="flex-1 flex flex-col min-w-0 overflow-y-auto pb-8">
 
     <!-- Encabezado -->
-    <header class="p-6 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <header class="px-4 sm:px-6 pt-5 pb-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <div>
-            <h1 class="text-2xl font-bold text-white tracking-tight">Historial de Cierres <span
-                    class="text-xs font-medium px-2.5 py-1 rounded-full bg-gray-800 text-orange-400 border border-orange-500/20">Administración</span></h1>
-            <p class="text-sm text-gray-400 mt-0.5">Consulta de reportes de cuadre de caja y arqueos diarios</p>
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight">Historial de Cierres</h1>
+                <span class="text-[11px] sm:text-xs font-medium px-2.5 py-0.5 rounded-full bg-gray-800 text-orange-400 border border-orange-500/20">Administración</span>
+            </div>
+            <p class="text-xs sm:text-sm text-gray-400 mt-1">Consulta de reportes de cuadre de caja y arqueos diarios</p>
         </div>
     </header>
+
     <!-- Formulario de Filtro por Rango de Fecha -->
-<section class="px-6 py-4">
-    <form method="GET" action="{{ url_for('vista_reporte_cierres') }}" class="flex flex-wrap gap-4 items-end bg-[#1a1b1e] p-4 rounded-xl border border-gray-800">
-        
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1">Fecha Inicio</label>
-            <input type="date" name="fecha_inicio" value="{{ fecha_inicio or '' }}" class="bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-sm focus:border-orange-500 outline-none">
-        </div>
-        
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1">Fecha Fin</label>
-            <input type="date" name="fecha_fin" value="{{ fecha_fin or '' }}" class="bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-sm focus:border-orange-500 outline-none">
-        </div>
-
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1">Propietario</label>
-            <select name="propietario_id" class="bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-sm focus:border-orange-500 outline-none w-32 md:w-40">
-                <option value="">Todos</option>
-                {% for p in propietarios %}
-                    <option value="{{ p.id }}" {% if propietario_id == p.id|string %}selected{% endif %}>{{ p.nombre }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="flex flex-col">
-            <label class="text-xs text-gray-400 mb-1">Proveedor</label>
-            <select name="proveedor_id" class="bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-sm focus:border-orange-500 outline-none w-32 md:w-40">
-                <option value="">Todos</option>
-                {% for prov in proveedores %}
-                    <option value="{{ prov.id }}" {% if proveedor_id == prov.id|string %}selected{% endif %}>{{ prov.nombre }}</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-            <button type="submit" class="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-semibold transition">Filtrar</button>
+    <section class="px-4 sm:px-6 py-3">
+        <form method="GET" action="{{ url_for('vista_reporte_cierres') }}" class="grid grid-cols-2 sm:flex sm:flex-wrap gap-3 sm:gap-4 items-end bg-[#1a1b1e] p-3.5 sm:p-4 rounded-xl border border-gray-800">
             
+            <div class="flex flex-col col-span-1">
+                <label class="text-xs text-gray-400 mb-1">Fecha Inicio</label>
+                <input type="date" name="fecha_inicio" value="{{ fecha_inicio or '' }}" class="w-full bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-xs sm:text-sm focus:border-orange-500 outline-none">
+            </div>
+            
+            <div class="flex flex-col col-span-1">
+                <label class="text-xs text-gray-400 mb-1">Fecha Fin</label>
+                <input type="date" name="fecha_fin" value="{{ fecha_fin or '' }}" class="w-full bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-xs sm:text-sm focus:border-orange-500 outline-none">
+            </div>
+
+            <div class="flex flex-col col-span-1">
+                <label class="text-xs text-gray-400 mb-1">Propietario</label>
+                <select name="propietario_id" class="w-full sm:w-36 md:w-40 bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-xs sm:text-sm focus:border-orange-500 outline-none">
+                    <option value="">Todos</option>
+                    {% for p in propietarios %}
+                        <option value="{{ p.id }}" {% if propietario_id == p.id|string %}selected{% endif %}>{{ p.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex flex-col col-span-1">
+                <label class="text-xs text-gray-400 mb-1">Proveedor</label>
+                <select name="proveedor_id" class="w-full sm:w-36 md:w-40 bg-[#121316] text-white border border-gray-700 rounded-lg p-2 text-xs sm:text-sm focus:border-orange-500 outline-none">
+                    <option value="">Todos</option>
+                    {% for prov in proveedores %}
+                        <option value="{{ prov.id }}" {% if proveedor_id == prov.id|string %}selected{% endif %}>{{ prov.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="flex gap-2 col-span-2 sm:w-auto mt-1 sm:mt-0">
+                <button type="submit" class="flex-1 sm:flex-none px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm font-semibold transition text-center">Filtrar</button>
+                
+                {% if fecha_inicio or propietario_id or proveedor_id %}
+                    <a href="{{ url_for('vista_reporte_cierres') }}" class="flex-1 sm:flex-none px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition text-center">Limpiar</a>
+                {% endif %}
+            </div>
+        </form>
+    </section>
+
+    <!-- Panel de Resumen Consolidado (Visible solo si hay filtro activo) -->
+    {% if fecha_inicio %}
+    <section class="px-4 sm:px-6 py-2 mb-4">
+        <div class="bg-[#1a1b1e] border border-orange-500/30 rounded-2xl overflow-hidden shadow-2xl p-3.5 sm:p-5">
+            <h2 class="text-base sm:text-lg font-bold text-white mb-3 sm:mb-4">Resumen ({{ fecha_inicio }} a {{ fecha_fin }})</h2>
+            
+            <!-- Métricas de Caja -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mb-4 sm:mb-6">
+                <div class="bg-[#121316] p-2.5 sm:p-3 rounded-xl border border-gray-800 text-center">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase block">Efectivo Total</span>
+                    <span class="text-base sm:text-xl font-bold text-white font-mono mt-0.5 block truncate">${{ "%.2f"|format(resumen.efectivo_caja) }}</span>
+                </div>
+                <div class="bg-[#121316] p-2.5 sm:p-3 rounded-xl border border-gray-800 text-center">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase block">Transferencias</span>
+                    <span class="text-base sm:text-xl font-bold text-sky-400 font-mono mt-0.5 block truncate">${{ "%.2f"|format(resumen.total_transferencias) }}</span>
+                </div>
+                <div class="bg-[#121316] p-2.5 sm:p-3 rounded-xl border border-gray-800 text-center">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase block">Total Esperado</span>
+                    <span class="text-base sm:text-xl font-bold text-emerald-400 font-mono mt-0.5 block truncate">${{ "%.2f"|format(resumen.total_esperado) }}</span>
+                </div>
+                <div class="bg-[#121316] p-2.5 sm:p-3 rounded-xl border border-gray-800 text-center">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase block">Diferencia Neta</span>
+                    <span class="text-base sm:text-xl font-bold font-mono mt-0.5 block truncate {% if resumen.diferencia < 0 %}text-red-400{% else %}text-blue-400{% endif %}">${{ "%.2f"|format(resumen.diferencia) }}</span>
+                </div>
+            </div>
+
+            <!-- Métricas de Rentabilidad -->
             {% if fecha_inicio or propietario_id or proveedor_id %}
-                <a href="{{ url_for('vista_reporte_cierres') }}" class="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition">Limpiar</a>
-            {% endif %}
-        </div>
-    </form>
-</section>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 my-4 sm:my-6">
+                <div class="bg-[#121316] sm:bg-[#1a1b1e] border border-orange-600/50 p-3.5 sm:p-4 rounded-xl relative overflow-hidden flex sm:block items-center justify-between">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-orange-600/10 rounded-full blur-xl"></div>
+                    <div class="flex items-center gap-2 sm:justify-between sm:mb-2 relative z-10">
+                        <h3 class="text-xs text-orange-400 font-semibold uppercase tracking-wider">Total Venta</h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <p class="text-lg sm:text-2xl font-bold text-white font-mono relative z-10">
+                        ${{ "{:,.2f}".format(resumen.subtotal_filtrado) }}
+                    </p>
+                </div>
 
-<!-- Panel de Resumen Consolidado (Visible solo si hay filtro activo) -->
-{% if fecha_inicio %}
-<section class="px-6 py-2 mb-4">
-    <div class="bg-[#1a1b1e] border border-orange-500/30 rounded-2xl overflow-hidden shadow-2xl p-4">
-        <h2 class="text-lg font-bold text-white mb-4">Resumen de Ventas ({{ fecha_inicio }} a {{ fecha_fin }})</h2>
+                <div class="bg-[#121316] sm:bg-[#1a1b1e] border border-blue-600/50 p-3.5 sm:p-4 rounded-xl relative overflow-hidden flex sm:block items-center justify-between">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-blue-600/10 rounded-full blur-xl"></div>
+                    <div class="flex items-center gap-2 sm:justify-between sm:mb-2 relative z-10">
+                        <h3 class="text-xs text-blue-400 font-semibold uppercase tracking-wider">Costo Invertido</h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                    </div>
+                    <p class="text-lg sm:text-2xl font-bold text-white font-mono relative z-10">
+                        ${{ "{:,.2f}".format(resumen.costo_filtrado) }}
+                    </p>
+                </div>
+
+                <div class="bg-[#121316] sm:bg-[#1a1b1e] border border-green-600/50 p-3.5 sm:p-4 rounded-xl relative overflow-hidden flex sm:block items-center justify-between">
+                    <div class="absolute -right-4 -top-4 w-16 h-16 bg-green-600/10 rounded-full blur-xl"></div>
+                    <div class="flex items-center gap-2 sm:justify-between sm:mb-2 relative z-10">
+                        <h3 class="text-xs text-green-400 font-semibold uppercase tracking-wider">Ganancia Neta</h3>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                    </div>
+                    <p class="text-lg sm:text-2xl font-bold text-white font-mono relative z-10">
+                        ${{ "{:,.2f}".format(resumen.ganancia_filtrada) }}
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+                <h3 class="text-xs sm:text-sm font-semibold text-gray-400 uppercase">Productos Vendidos en este Periodo</h3>
+
+                <!-- Botones de Acción (Copiar Tabla, Imprimir y WhatsApp) -->
+                <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+                    <button onclick="copiarTabla('tabla-productos-filtrados', this)" type="button"
+                        class="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-xs sm:text-sm font-semibold transition border border-gray-700 shadow-md">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <span class="btn-texto">Copiar Tabla</span>
+                    </button>
+
+                    <button onclick="imprimirTabla()" type="button"
+                        class="flex items-center justify-center gap-1.5 px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-lg text-xs sm:text-sm font-semibold transition shadow-sm">
+                        <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                        </svg>
+                        <span>Imprimir</span>
+                    </button>
+
+                    {% if whatsapp_url %}
+                    <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" 
+                    class="col-span-2 flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-xs sm:text-sm font-semibold transition shadow-lg shadow-green-900/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 sm:h-5 sm:w-5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 1.938 6.55L.13 24l5.656-1.782A12 12 0 0 0 11.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 21.905c-1.895 0-3.754-.486-5.412-1.408l-.389-.214-3.535 1.114 1.134-3.418-.242-.397A9.878 9.878 0 0 1 2.1 12c0-5.457 4.443-9.9 9.9-9.9 5.457 0 9.9 4.443 9.9 9.9 0 5.457-4.443 9.9-9.9 9.9zM17.432 15.6c-.302-.152-1.792-.885-2.07-.987-.277-.101-.48-.152-.68.152-.202.304-.783.987-.96 1.189-.177.203-.355.228-.657.076-1.637-.803-2.909-1.921-3.784-3.416-.102-.178-.01-.274.091-.424.162-.24.354-.482.476-.685.122-.203.04-.38-.036-.532-.15-.304-.68-1.642-.932-2.25-.246-.591-.497-.512-.68-.522h-.58c-.203 0-.532.076-.81.38-.278.304-1.063 1.038-1.063 2.532s1.088 2.936 1.24 3.139c.152.203 2.135 3.256 5.176 4.566 1.836.79 2.527.674 3.109.558.68-.135 1.792-.733 2.044-1.442.253-.709.253-1.317.177-1.442-.075-.125-.277-.2-.58-.352z"/>
+                        </svg>
+                        Enviar Reporte por WhatsApp
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Tabla de Productos Vendidos (Scroll horizontal y vertical suave en móvil) -->
+            <div class="max-h-64 overflow-auto rounded-lg border border-gray-800/80">
+                <table id="tabla-productos-filtrados" class="w-full text-left text-xs sm:text-sm border-collapse whitespace-nowrap">
+                    <thead class="sticky top-0 bg-[#222429] z-10">
+                        <tr class="text-left text-[11px] sm:text-xs text-gray-400 border-b border-gray-700">
+                            <th class="p-2.5 sm:p-3">Producto</th>
+                            <th class="p-2.5 sm:p-3 text-center">Cant.</th>
+                            <th class="p-2.5 sm:p-3 text-right">Costo U.</th>
+                            <th class="p-2.5 sm:p-3 text-right">Costo Total</th>
+                            <th class="p-2.5 sm:p-3 text-right">Venta U.</th>
+                            <th class="p-2.5 sm:p-3 text-right">Importe</th>
+                            <th class="p-2.5 sm:p-3 text-right">Ganancia</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-800/50">
+                        {% for nombre, datos in resumen.productos.items() %}
+                        <tr class="hover:bg-gray-800/30">
+                            <td class="p-2.5 sm:p-3 text-white font-medium max-w-[160px] sm:max-w-none truncate">{{ nombre }}</td>
+                            <td class="p-2.5 sm:p-3 text-center text-gray-300">{{ datos.vendidos }}</td>
+                            <td class="p-2.5 sm:p-3 text-right text-gray-300 font-mono">
+                                ${{ "{:,.2f}".format(datos.precio_costo) }}
+                            </td>
+                            <td class="p-2.5 sm:p-3 text-right font-semibold text-white font-mono">
+                                ${{ "{:,.2f}".format(datos.costo) }}
+                            </td>
+                            <td class="p-2.5 sm:p-3 text-right text-gray-300 font-mono">
+                                ${{ "{:,.2f}".format(datos.precio_venta) }}
+                            </td>
+                            <td class="p-2.5 sm:p-3 text-right font-semibold text-emerald-400 font-mono">
+                                ${{ "{:,.2f}".format(datos.subtotal) }}
+                            </td>
+                            <td class="p-2.5 sm:p-3 text-right font-semibold text-amber-400 font-mono">
+                                ${{ "{:,.2f}".format(datos.ganancia) }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Historial de Cierres -->
+    <section class="px-4 sm:px-6 py-2 flex-1">
         
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="bg-[#121316] p-3 rounded-xl border border-gray-800 text-center">
-                <span class="text-xs text-gray-400 uppercase">Efectivo Total</span>
-                <span class="text-xl font-bold text-white block">${{ "%.2f"|format(resumen.efectivo_caja) }}</span>
-            </div>
-            <div class="bg-[#121316] p-3 rounded-xl border border-gray-800 text-center">
-                <span class="text-xs text-gray-400 uppercase">Transferencias</span>
-                <span class="text-xl font-bold text-sky-400 block">${{ "%.2f"|format(resumen.total_transferencias) }}</span>
-            </div>
-            <div class="bg-[#121316] p-3 rounded-xl border border-gray-800 text-center">
-                <span class="text-xs text-gray-400 uppercase">Total Esperado</span>
-                <span class="text-xl font-bold text-emerald-400 block">${{ "%.2f"|format(resumen.total_esperado) }}</span>
-            </div>
-            <div class="bg-[#121316] p-3 rounded-xl border border-gray-800 text-center">
-                <span class="text-xs text-gray-400 uppercase">Diferencia Neta</span>
-                <span class="text-xl font-bold {% if resumen.diferencia < 0 %}text-red-400{% else %}text-blue-400{% endif %} block">${{ "%.2f"|format(resumen.diferencia) }}</span>
-            </div>
-        </div>
-
-        {% if fecha_inicio or propietario_id or proveedor_id %}
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-6">
-            <div class="bg-[#1a1b1e] border border-orange-600/50 p-4 rounded-xl relative overflow-hidden">
-                <div class="absolute -right-4 -top-4 w-16 h-16 bg-orange-600/10 rounded-full blur-xl"></div>
-                <div class="flex items-center justify-between mb-2 relative z-10">
-                    <h3 class="text-xs text-orange-400 font-semibold uppercase tracking-wider">Total Venta</h3>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+        <!-- VISTA MÓVIL: Tarjetas (Visible solo en pantallas menores a md) -->
+        <div class="md:hidden space-y-3">
+            {% for c in cierres %}
+            <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-4 shadow-lg space-y-3">
+                <!-- Cabecera de tarjeta -->
+                <div class="flex items-start justify-between gap-2 border-b border-gray-800/80 pb-2.5">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono font-bold text-orange-400 text-sm">#{{ c.id }}</span>
+                            <span class="text-white font-semibold text-sm">{{ c.usuario_nombre }}</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-0.5">{{ c.fecha.strftime('%d/%m/%Y %I:%M %p') }}</p>
+                    </div>
+                    <div class="text-right">
+                        {% if c.diferencia < 0 %}
+                            <span class="inline-block px-2 py-0.5 rounded-md bg-red-500/10 border border-red-500/30 text-red-400 font-mono text-xs font-bold">
+                                -${{ "%.2f"|format(c.diferencia|abs) }}
+                            </span>
+                            <span class="block text-[10px] text-red-400/80 mt-0.5">Faltante</span>
+                        {% elif c.diferencia > 0 %}
+                            <span class="inline-block px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-400 font-mono text-xs font-bold">
+                                +${{ "%.2f"|format(c.diferencia) }}
+                            </span>
+                            <span class="block text-[10px] text-blue-400/80 mt-0.5">Sobrante</span>
+                        {% else %}
+                            <span class="inline-block px-2 py-0.5 rounded-md bg-gray-800 text-gray-300 font-mono text-xs font-bold">
+                                $0.00
+                            </span>
+                            <span class="block text-[10px] text-gray-500 mt-0.5">Exacto</span>
+                        {% endif %}
+                    </div>
                 </div>
-                <p class="text-2xl font-bold text-white relative z-10">
-                    ${{ "{:,.2f}".format(resumen.subtotal_filtrado) }}
-                </p>
-            </div>
 
-            <div class="bg-[#1a1b1e] border border-blue-600/50 p-4 rounded-xl relative overflow-hidden">
-                <div class="absolute -right-4 -top-4 w-16 h-16 bg-blue-600/10 rounded-full blur-xl"></div>
-                <div class="flex items-center justify-between mb-2 relative z-10">
-                    <h3 class="text-xs text-blue-400 font-semibold uppercase tracking-wider">Costo Invertido</h3>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
+                <!-- Valores numéricos en grid de 3 columnas -->
+                <div class="grid grid-cols-3 gap-2 bg-[#121316] p-2.5 rounded-xl border border-gray-800/80 text-center">
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase block">Esperado</span>
+                        <span class="text-emerald-400 font-mono font-bold text-xs">${{ "%.2f"|format(c.total_esperado) }}</span>
+                    </div>
+                    <div class="border-x border-gray-800">
+                        <span class="text-[10px] text-gray-400 uppercase block">Transf.</span>
+                        <span class="text-sky-400 font-mono font-bold text-xs">${{ "%.2f"|format(c.total_transferencias or 0.0) }}</span>
+                    </div>
+                    <div>
+                        <span class="text-[10px] text-gray-400 uppercase block">Efectivo</span>
+                        <span class="text-white font-mono font-bold text-xs">${{ "%.2f"|format(c.efectivo_caja) }}</span>
+                    </div>
                 </div>
-                <p class="text-2xl font-bold text-white relative z-10">
-                    ${{ "{:,.2f}".format(resumen.costo_filtrado) }}
-                </p>
-            </div>
 
-            <div class="bg-[#1a1b1e] border border-green-600/50 p-4 rounded-xl relative overflow-hidden">
-                <div class="absolute -right-4 -top-4 w-16 h-16 bg-green-600/10 rounded-full blur-xl"></div>
-                <div class="flex items-center justify-between mb-2 relative z-10">
-                    <h3 class="text-xs text-green-400 font-semibold uppercase tracking-wider">Ganancia Neta</h3>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                <!-- Botón de acción ancho completo -->
+                <button onclick="verDetalleCierre({{ c.id }})"
+                    class="w-full py-2.5 bg-gray-800 hover:bg-orange-600 active:bg-orange-500 text-gray-200 hover:text-white rounded-xl text-xs font-semibold transition flex items-center justify-center gap-1.5 border border-gray-700/80">
+                    <span>Ver Detalle del Cierre</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                     </svg>
-                </div>
-                <p class="text-2xl font-bold text-white relative z-10">
-                    ${{ "{:,.2f}".format(resumen.ganancia_filtrada) }}
-                </p>
+                </button>
             </div>
-        </div>
-        {% endif %}
-
-        <h3 class="text-sm font-semibold text-gray-400 uppercase mb-2">Productos Vendidos en este Periodo</h3>
-
-        <!-- Botones de Acción (Copiar Tabla y WhatsApp) -->
-        <div class="flex flex-wrap justify-end gap-2 mb-4">
-            <!-- Botón Copiar Tabla -->
-            <button onclick="copiarTabla('tabla-productos-filtrados', this)" type="button"
-                class="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-semibold transition border border-gray-700 shadow-md">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <span class="btn-texto">Copiar Tabla</span>
-            </button>
-            <button onclick="imprimirTabla()" 
-                class="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shadow-sm">
-                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2n2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                </svg>
-                <span>Imprimir</span>
-            </button>
-            <!-- Botón de WhatsApp -->
-            {% if whatsapp_url %}
-            <a href="{{ whatsapp_url }}" target="_blank" rel="noopener noreferrer" 
-            class="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg text-sm font-semibold transition shadow-lg shadow-green-900/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 1.938 6.55L.13 24l5.656-1.782A12 12 0 0 0 11.944 24c6.627 0 12-5.373 12-12s-5.373-12-12-12zm.056 21.905c-1.895 0-3.754-.486-5.412-1.408l-.389-.214-3.535 1.114 1.134-3.418-.242-.397A9.878 9.878 0 0 1 2.1 12c0-5.457 4.443-9.9 9.9-9.9 5.457 0 9.9 4.443 9.9 9.9 0 5.457-4.443 9.9-9.9 9.9zM17.432 15.6c-.302-.152-1.792-.885-2.07-.987-.277-.101-.48-.152-.68.152-.202.304-.783.987-.96 1.189-.177.203-.355.228-.657.076-1.637-.803-2.909-1.921-3.784-3.416-.102-.178-.01-.274.091-.424.162-.24.354-.482.476-.685.122-.203.04-.38-.036-.532-.15-.304-.68-1.642-.932-2.25-.246-.591-.497-.512-.68-.522h-.58c-.203 0-.532.076-.81.38-.278.304-1.063 1.038-1.063 2.532s1.088 2.936 1.24 3.139c.152.203 2.135 3.256 5.176 4.566 1.836.79 2.527.674 3.109.558.68-.135 1.792-.733 2.044-1.442.253-.709.253-1.317.177-1.442-.075-.125-.277-.2-.58-.352z"/>
-                </svg>
-                Enviar Reporte por WhatsApp
-            </a>
-            {% endif %}
+            {% else %}
+            <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl p-8 text-center text-gray-500 text-sm">
+                No hay cierres registrados.
+            </div>
+            {% endfor %}
         </div>
 
-        <div class="max-h-48 overflow-y-auto">
-           <table id="tabla-productos-filtrados" class="w-full text-left text-sm border-collapse">
-            <thead>
-                <tr class="text-left text-xs text-gray-400 border-b border-gray-700">
-                    <th class="pb-2">Producto</th>
-                    <th class="pb-2 text-center">Cant. Vendida</th>
-                    <th class="pb-2 text-right">Precio Costo U.</th>
-                    <th class="pb-2 text-right">Costo Total</th>
-                    <th class="pb-2 text-right">Precio Venta U.</th> <!-- NUEVA COLUMNA -->
-                    <th class="pb-2 text-right">Importe Venta</th>   <!-- NUEVA COLUMNA -->
-                    <th class="pb-2 text-right">Ganancia</th>   <!-- NUEVA COLUMNA -->
-                </tr>
-            </thead>
-            <tbody>
-                {% for nombre, datos in resumen.productos.items() %}
-                <tr class="border-b border-gray-800/50 text-sm">
-                    <td class="py-3 text-white">{{ nombre }}</td>
-                    <td class="py-3 text-center text-gray-300">{{ datos.vendidos }}</td>
-                    <td class="py-3 text-right text-gray-300 font-mono">
-                        ${{ "{:,.2f}".format(datos.precio_costo) }}
-                    </td>
-                    <td class="py-3 text-right font-semibold text-white font-mono">
-                        ${{ "{:,.2f}".format(datos.costo) }}
-                    </td>
-                    <td class="py-3 text-right text-gray-300 font-mono">
-                        ${{ "{:,.2f}".format(datos.precio_venta) }}
-                    </td>
-                    <td class="py-3 text-right font-semibold text-emerald-400 font-mono">
-                        ${{ "{:,.2f}".format(datos.subtotal) }}
-                    </td>
-                    <td class="py-3 text-right font-semibold text-amber-400 font-mono">
-                        ${{ "{:,.2f}".format(datos.ganancia) }}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        </div>
-    </div>
-</section>
-{% endif %}
-
-    <!-- Tabla Histórica de Cierres -->
-    <section class="p-6 flex-1">
-        <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+        <!-- VISTA ESCRITORIO: Tabla (Oculta en móvil, visible desde md) -->
+        <div class="hidden md:block bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse">
                     <thead>
@@ -252,74 +327,81 @@
 </main>
 
 <!-- Modal de Detalle del Cierre -->
-<div id="modal-detalle-cierre" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+<div id="modal-detalle-cierre" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-2 sm:p-4 z-50">
+    <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
         
         <!-- Header Modal -->
-        <div class="p-6 border-b border-gray-800 flex justify-between items-center">
+        <div class="p-4 sm:p-6 border-b border-gray-800 flex justify-between items-start sm:items-center gap-2 shrink-0">
             <div>
-                <h3 class="text-xl font-bold text-white" id="modal-cierre-titulo">Detalle del Cierre #</h3>
-                <p class="text-xs text-gray-400 mt-1" id="modal-cierre-subtitulo">Fecha: - | Responsable: -</p>
+                <h3 class="text-base sm:text-xl font-bold text-white" id="modal-cierre-titulo">Detalle del Cierre #</h3>
+                <p class="text-[11px] sm:text-xs text-gray-400 mt-0.5" id="modal-cierre-subtitulo">Fecha: - | Responsable: -</p>
             </div>
-            <button onclick="cerrarModalDetalleCierre()" class="text-gray-400 hover:text-white p-2 text-xl font-bold">&times;</button>
+            <button onclick="cerrarModalDetalleCierre()" class="text-gray-400 hover:text-white p-1.5 bg-gray-800/60 rounded-lg text-lg leading-none font-bold">×</button>
         </div>
 
-        <!-- Indicadores / Totales (4 Columnas) -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-6 bg-[#121316] border-b border-gray-800 text-center">
-            <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
-                <span class="text-xs text-gray-400 uppercase tracking-wider block">Total Esperado</span>
-                <span id="modal-total-esperado" class="text-xl font-bold text-emerald-400 font-mono">$0.00</span>
+        <!-- Contenido Scrolleable del Modal -->
+        <div class="overflow-y-auto flex-1">
+            <!-- Indicadores / Totales (2x2 en móvil, 4 en escritorio) -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 p-4 sm:p-6 bg-[#121316] border-b border-gray-800 text-center">
+                <div class="bg-[#1a1b1e] p-2.5 sm:p-3 rounded-xl border border-gray-800">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider block">Total Esperado</span>
+                    <span id="modal-total-esperado" class="text-base sm:text-xl font-bold text-emerald-400 font-mono">$0.00</span>
+                </div>
+                <div class="bg-[#1a1b1e] p-2.5 sm:p-3 rounded-xl border border-gray-800">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider block">Transferencias</span>
+                    <span id="modal-total-transferencias" class="text-base sm:text-xl font-bold text-sky-400 font-mono">$0.00</span>
+                </div>
+                <div class="bg-[#1a1b1e] p-2.5 sm:p-3 rounded-xl border border-gray-800">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider block">Efectivo en Caja</span>
+                    <span id="modal-efectivo-caja" class="text-base sm:text-xl font-bold text-white font-mono">$0.00</span>
+                </div>
+                <div class="bg-[#1a1b1e] p-2.5 sm:p-3 rounded-xl border border-gray-800">
+                    <span class="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider block">Diferencia</span>
+                    <span id="modal-diferencia" class="text-base sm:text-xl font-bold font-mono">$0.00</span>
+                </div>
             </div>
-            <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
-                <span class="text-xs text-gray-400 uppercase tracking-wider block">Transferencias</span>
-                <span id="modal-total-transferencias" class="text-xl font-bold text-sky-400 font-mono">$0.00</span>
-            </div>
-            <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
-                <span class="text-xs text-gray-400 uppercase tracking-wider block">Efectivo en Caja</span>
-                <span id="modal-efectivo-caja" class="text-xl font-bold text-white font-mono">$0.00</span>
-            </div>
-            <div class="bg-[#1a1b1e] p-3 rounded-xl border border-gray-800">
-                <span class="text-xs text-gray-400 uppercase tracking-wider block">Diferencia</span>
-                <span id="modal-diferencia" class="text-xl font-bold font-mono">$0.00</span>
-            </div>
-        </div>
 
-        <div class="px-6 py-4 bg-[#16171a] border-b border-gray-800">
-            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Desglose por Propietario (Venta Bruta y Ganancia)</h4>
-            <div id="modal-ganancias-propietarios" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <!-- Se llenará dinámicamente con JavaScript -->
+            <!-- Desglose por Propietario -->
+            <div class="px-4 sm:px-6 py-3 sm:py-4 bg-[#16171a] border-b border-gray-800">
+                <h4 class="text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Desglose por Propietario (Venta Bruta y Ganancia)</h4>
+                <div id="modal-ganancias-propietarios" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+                    <!-- Se llenará dinámicamente con JavaScript -->
+                </div>
             </div>
-        </div>
 
-        <!-- Bloque de Observaciones del Turno en el Modal -->
-        <div class="px-6 py-3 bg-[#16171a] border-b border-gray-800">
-            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Observaciones del Turno</h4>
-            <p id="modal-observaciones" class="text-sm text-gray-300 italic bg-[#121316] p-3 rounded-xl border border-gray-800/80">Sin observaciones.</p>
-        </div>
+            <!-- Bloque de Observaciones del Turno -->
+            <div class="px-4 sm:px-6 py-3 bg-[#16171a] border-b border-gray-800">
+                <h4 class="text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1">Observaciones del Turno</h4>
+                <p id="modal-observaciones" class="text-xs sm:text-sm text-gray-300 italic bg-[#121316] p-2.5 sm:p-3 rounded-xl border border-gray-800/80">Sin observaciones.</p>
+            </div>
 
-        <!-- Tabla con desglose de productos -->
-        <div class="p-6 overflow-y-auto flex-1">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
-                        <th class="p-3">Producto</th>
-                        <th class="p-3">Precio</th>
-                        <th class="p-3">Inicial</th>
-                        <th class="p-3">Entradas</th>
-                        <th class="p-3">Final</th>
-                        <th class="p-3">Vendidos</th>
-                        <th class="p-3 text-right">Subtotal</th>
-                    </tr>
-                </thead>
-                <tbody id="modal-tabla-detalles" class="divide-y divide-gray-800/60 text-sm">
-                    <!-- Contenido dinámico mediante JS -->
-                </tbody>
-            </table>
+            <!-- Tabla con desglose de productos (Con scroll horizontal para móvil) -->
+            <div class="p-4 sm:p-6">
+                <h4 class="text-[11px] sm:text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Detalle de Productos</h4>
+                <div class="overflow-x-auto rounded-xl border border-gray-800">
+                    <table class="w-full text-left border-collapse whitespace-nowrap text-xs sm:text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-800 text-[11px] sm:text-xs font-semibold text-gray-400 uppercase bg-[#222429]">
+                                <th class="p-2.5 sm:p-3">Producto</th>
+                                <th class="p-2.5 sm:p-3 text-right">Precio</th>
+                                <th class="p-2.5 sm:p-3 text-center">Ini</th>
+                                <th class="p-2.5 sm:p-3 text-center">Ent</th>
+                                <th class="p-2.5 sm:p-3 text-center">Fin</th>
+                                <th class="p-2.5 sm:p-3 text-center">Vend</th>
+                                <th class="p-2.5 sm:p-3 text-right">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-tabla-detalles" class="divide-y divide-gray-800/60">
+                            <!-- Contenido dinámico mediante JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- Footer Modal -->
-        <div class="p-4 border-t border-gray-800 flex justify-end">
-            <button onclick="cerrarModalDetalleCierre()" class="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-xl transition">
+        <div class="p-3 sm:p-4 border-t border-gray-800 flex justify-end shrink-0 bg-[#1a1b1e]">
+            <button onclick="cerrarModalDetalleCierre()" class="w-full sm:w-auto px-6 py-2.5 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-xl transition">
                 Cerrar
             </button>
         </div>
