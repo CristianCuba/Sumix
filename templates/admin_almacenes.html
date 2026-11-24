@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
 {% block content %}
-
+{% macro fmt_cant(val) -%}
+    {%- set num = (val or 0)|round(2) -%}
+    {%- set txt = "%.2f"|format(num) -%}
+    {%- if '.' in txt -%}
+        {%- set txt = txt.rstrip('0').rstrip('.') -%}
+    {%- endif -%}
+    {{- txt if txt else '0' -}}
+{%- endmacro %}
 <header class="p-6 space-y-6">
     <!-- 1. Título de la página + Botón Acción -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -111,7 +118,7 @@
     <div class="bg-[#1a1b1e] border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
         
         <!-- VISTA DE ESCRITORIO (Oculto en celulares, visible en pantallas medianas en adelante) -->
-         <!-- Botones de Utilidad: Imprimir y Copiar -->
+        <!-- Botones de Utilidad: Imprimir y Copiar -->
         <div class="flex items-center justify-end gap-2 px-4 sm:px-6 mb-3">
             <button onclick="copiarTablaAlPortapapeles()" 
                 class="px-3.5 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 shadow-sm">
@@ -174,7 +181,7 @@
                                             {% if stock.almacen.ubicacion %}
                                                 <span class="text-[10px] text-gray-500">({{ stock.almacen.ubicacion }})</span>
                                             {% endif %}
-                                            <span class="font-mono text-gray-400 font-bold ml-auto">: {{ stock.cantidad }}</span>
+                                            <span class="font-mono text-gray-400 font-bold ml-auto">: {{ fmt_cant(stock.cantidad) }}</span>
                                         </div>
                                     {% endif %}
                                 {% else %}
@@ -215,7 +222,7 @@
                         </td>
 
                         <td class="p-4 text-center font-mono font-bold text-amber-400">
-                            {{ producto.cantidad_total }}
+                            {{ fmt_cant(producto.cantidad_total) }}
                         </td>
 
                         <td class="p-4 text-center">
@@ -266,7 +273,7 @@
                         <h3 class="font-bold text-white text-base truncate">{{ producto.nombre }}</h3>
                         <div class="flex items-center gap-3 mt-1">
                             <span class="font-mono font-bold text-emerald-400 text-sm">Venta: ${{ "%.2f"|format(producto.precio_venta) }}</span>
-                            <span class="text-xs text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md">Stock: {{ producto.cantidad_total }}</span>
+                            <span class="text-xs text-amber-400 font-mono bg-amber-500/10 px-2 py-0.5 rounded-md">Stock: {{ fmt_cant(producto.cantidad_total) }}</span>
                         </div>
                     </div>
 
@@ -308,7 +315,7 @@
                             {% if stock.cantidad > 0 %}
                                 <div class="flex justify-between text-xs">
                                     <span class="text-gray-400">{{ stock.almacen.nombre }}:</span>
-                                    <span class="font-mono font-bold text-white">{{ stock.cantidad }}</span>
+                                    <span class="font-mono font-bold text-white">{{ fmt_cant(stock.cantidad) }}</span>
                                 </div>
                             {% endif %}
                         {% else %}
@@ -339,6 +346,7 @@
 
     </div>
 </section>
+
 
 <!-- Script para el acordeón móvil -->
 <script>

@@ -225,7 +225,7 @@ function calcular() {
         const entradas = inputEntradas ? (parseFloat(inputEntradas.value) || 0) : 0;
         const stockFinal = inputFinal ? (parseFloat(inputFinal.value) || 0) : 0;
 
-        let vendidos = (stockInicial + entradas) - stockFinal;
+        let vendidos = Math.round(((stockInicial + entradas) - stockFinal) * 100) / 100;
 
         const spanVendidos = fila.querySelector('.vendidos');
         const spanSubtotal = fila.querySelector('.subtotal');
@@ -238,7 +238,7 @@ function calcular() {
             }
         } else {
             if (spanVendidos) {
-                spanVendidos.textContent = vendidos;
+                spanVendidos.textContent = formatearCantidad(vendidos);
                 spanVendidos.className = "p-4 font-bold text-white font-mono vendidos";
             }
         }
@@ -268,38 +268,38 @@ function calcular() {
     const inputTransferencia = document.getElementById('dinero-transferencia');
     const totalTransferencias = inputTransferencia ? (parseFloat(inputTransferencia.value) || 0) : 0;
 
-    // --- NUEVO: Extraer deudas del día ---
+    // Deudas del día (permitidas; se descuentan del efectivo esperado en caja)
     const inputDeudas = document.getElementById('deudas-dia');
     const deudasDia = inputDeudas ? (parseFloat(inputDeudas.value) || 0) : 0;
 
-    // --- MODIFICADO: Restar las deudas al total esperado ---
-    let totalEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias - deudasDia;
+    // Efectivo que debe haber en caja una vez descontadas deducciones, transferencias y deudas del día
+    let efectivoEsperado = totalBrutoGeneral - descuentoTotal - totalTransferencias - deudasDia;
 
     const elemTotalEsperado = document.getElementById('total-esperado');
     const elemComisionDayana = document.getElementById('txt-comision-dayana');
     const elemSalarioCristian = document.getElementById('txt-salario-cristian');
 
     if (elemTotalEsperado) {
-        elemTotalEsperado.textContent = totalEsperado < 0
-            ? `-$${Math.abs(totalEsperado).toFixed(2)}`
-            : `$${totalEsperado.toFixed(2)}`;
+        elemTotalEsperado.textContent = efectivoEsperado < 0
+            ? `-$${Math.abs(efectivoEsperado).toFixed(2)}`
+            : `$${efectivoEsperado.toFixed(2)}`;
     }
 
     if (elemComisionDayana) elemComisionDayana.textContent = `$${comisionDayana.toFixed(2)}`;
     if (elemSalarioCristian) elemSalarioCristian.textContent = `$${descuentoCristian.toFixed(2)}`;
 
-    // --- NUEVO: Calcular y colorear Diferencia ---
+    // Diferencia real de caja: compara solo efectivo físico contra el efectivo esperado
     const inputEfectivo = document.getElementById('dinero-caja');
     const efectivoCaja = inputEfectivo ? (parseFloat(inputEfectivo.value) || 0) : 0;
 
-    let diferencia = efectivoCaja - totalEsperado;
+    let diferencia = efectivoCaja - efectivoEsperado;
 
     const diffInput = document.getElementById('diferencia-caja');
     const diffIcon = document.getElementById('icono-diferencia');
 
     if (diffInput && diffIcon) {
         diffInput.value = diferencia.toFixed(2);
-        
+
         let baseClasses = "w-28 bg-[#121316] border rounded-xl pl-7 pr-3 py-2.5 text-lg font-bold font-mono focus:outline-none cursor-not-allowed ";
         if (diferencia < 0) {
             diffInput.className = baseClasses + "border-rose-900/50 text-rose-400";
@@ -313,13 +313,15 @@ function calcular() {
         }
     }
 
-    validarCierreCaja(totalEsperado);
+    validarCierreCaja(efectivoEsperado);
 }
+
 
 async function enviarCierre() {
     const efectivoCaja = parseFloat(document.getElementById('dinero-caja').value) || 0;
     const totalTransferencias = parseFloat(document.getElementById('dinero-transferencia').value) || 0;
-    const observaciones = document.getElementById('cierre-observaciones') ? document.getElementById('cierre-observaciones').value : ''; // <--- NUEVO: Capturar input de observaciones
+    const deudasDia = parseFloat(document.getElementById('deudas-dia').value) || 0;
+    const observaciones = document.getElementById('cierre-observaciones') ? document.getElementById('cierre-observaciones').value : '';
     const filas = document.querySelectorAll('.fila-producto');
     let productos = [];
 
@@ -343,9 +345,10 @@ async function enviarCierre() {
             body: JSON.stringify({
                 efectivo_caja: efectivoCaja,
                 total_transferencias: totalTransferencias,
-                observaciones: observaciones, // <--- NUEVO: Enviar observaciones al backend
+                total_deudas: deudasDia,
+                observaciones: observaciones,
                 productos: productos,
-                deudas: [] 
+                deudas: []
             })
         });
 
@@ -383,33 +386,36 @@ async function verDetalleCierre(idCierre) {
 
         document.getElementById('modal-cierre-titulo').textContent = `Detalle del Cierre #${cierre.id}`;
         document.getElementById('modal-cierre-subtitulo').textContent = `Fecha: ${cierre.fecha} | Responsable: ${cierre.usuario_nombre}`;
-        
-        // --- NUEVO: Mostrar observaciones en el modal del admin ---
+
         const elObs = document.getElementById('modal-observaciones');
         if (elObs) {
             elObs.textContent = cierre.observaciones || 'Sin observaciones registradas.';
         }
 
-        document.getElementById('modal-total-esperado').textContent = `$${cierre.total_esperado.toFixed(2)}`;
-        
-        // Asignación de transferencias al modal
+        document.getElementById('modal-total-esperado').textContent = `$${(cierre.total_esperado || 0).toFixed(2)}`;
+
         const elTransf = document.getElementById('modal-total-transferencias');
         if (elTransf) {
             elTransf.textContent = `$${(cierre.total_transferencias || 0).toFixed(2)}`;
         }
 
-        document.getElementById('modal-efectivo-caja').textContent = `$${cierre.efectivo_caja.toFixed(2)}`;
+        const elDeudas = document.getElementById('modal-total-deudas');
+        if (elDeudas) {
+            elDeudas.textContent = `$${(cierre.total_deudas || 0).toFixed(2)}`;
+        }
+
+        document.getElementById('modal-efectivo-caja').textContent = `$${(cierre.efectivo_caja || 0).toFixed(2)}`;
 
         const elDif = document.getElementById('modal-diferencia');
         if (cierre.diferencia < 0) {
             elDif.textContent = `-$${Math.abs(cierre.diferencia).toFixed(2)}`;
-            elDif.className = "text-xl font-bold font-mono text-red-400";
+            elDif.className = "text-base sm:text-xl font-bold font-mono text-red-400";
         } else if (cierre.diferencia > 0) {
             elDif.textContent = `+$${cierre.diferencia.toFixed(2)}`;
-            elDif.className = "text-xl font-bold font-mono text-blue-400";
+            elDif.className = "text-base sm:text-xl font-bold font-mono text-blue-400";
         } else {
             elDif.textContent = "$0.00";
-            elDif.className = "text-xl font-bold font-mono text-gray-400";
+            elDif.className = "text-base sm:text-xl font-bold font-mono text-gray-400";
         }
 
         const contenedorPropietarios = document.getElementById('modal-ganancias-propietarios');
@@ -465,13 +471,13 @@ async function verDetalleCierre(idCierre) {
                 const tr = document.createElement('tr');
                 tr.className = "hover:bg-gray-800/30 transition-colors";
                 tr.innerHTML = `
-                    <td class="p-3 text-white font-medium">${d.nombre_producto}</td>
-                    <td class="p-3 text-gray-300">$${d.precio_venta.toFixed(2)}</td>
-                    <td class="p-3 text-gray-400 font-mono">${d.stock_inicial}</td>
-                    <td class="p-3 text-gray-400 font-mono">${d.entradas}</td>
-                    <td class="p-3 text-orange-400 font-bold font-mono">${d.stock_final}</td>
-                    <td class="p-3 text-white font-bold font-mono">${d.vendidos}</td>
-                    <td class="p-3 text-right font-bold font-mono text-white">$${d.subtotal.toFixed(2)}</td>
+                    <td class="p-2.5 sm:p-3 text-white font-medium">${d.nombre_producto}</td>
+                    <td class="p-2.5 sm:p-3 text-gray-300 font-mono">$${d.precio_venta.toFixed(2)}</td>
+                    <td class="p-2.5 sm:p-3 text-center text-gray-400 font-mono">${formatearCantidad(d.stock_inicial)}</td>
+                    <td class="p-2.5 sm:p-3 text-center text-gray-400 font-mono">${formatearCantidad(d.entradas)}</td>
+                    <td class="p-2.5 sm:p-3 text-center text-orange-400 font-bold font-mono">${formatearCantidad(d.stock_final)}</td>
+                    <td class="p-2.5 sm:p-3 text-center text-white font-bold font-mono">${formatearCantidad(d.vendidos)}</td>
+                    <td class="p-2.5 sm:p-3 text-right font-bold font-mono text-white">$${d.subtotal.toFixed(2)}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -488,6 +494,7 @@ async function verDetalleCierre(idCierre) {
         alert("Ocurrió un error al obtener el detalle del cierre.");
     }
 }
+
 
 function cerrarModalDetalleCierre() {
     const modal = document.getElementById('modal-detalle-cierre');
@@ -646,4 +653,9 @@ function imprimirTabla(tituloPersonalizado = null) {
 
     // Abrir el PDF generado en una nueva pestaña
     window.open(doc.output('bloburl'), '_blank');
+}
+function formatearCantidad(valor) {
+    const num = Number(valor) || 0;
+    const redondeado = Math.round(num * 100) / 100;
+    return Number.isInteger(redondeado) ? String(redondeado) : redondeado.toFixed(2).replace(/\.?0+$/, '');
 }

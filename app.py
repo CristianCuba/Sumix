@@ -1271,124 +1271,90 @@ def vista_admin():
 
 @app.route('/trasladar_stock', methods=['POST'])
 def trasladar_stock():
-    if 'user' not in session or session.get('rol') != 'admin':
+    if 'user' not in session:
         return redirect(url_for('login'))
 
     producto_id = request.form.get('producto_id', type=int)
-    tipo_operacion_id = request.form.get('tipo_operacion_id', type=int)
+    tipo_op_id = request.form.get('tipo_operacion_id', type=int)
     concepto_id = request.form.get('concepto_id', type=int)
     origen_id = request.form.get('almacen_origen_id', type=int)
     destino_id = request.form.get('almacen_destino_id', type=int)
-    cantidad = request.form.get('cantidad', type=float, default=0.0)
+    cantidad = round(float(request.form.get('cantidad', 0.0) or 0.0), 2)
 
-    # Validaciones básicas generales
-    if not producto_id or not tipo_operacion_id or not concepto_id or cantidad <= 0:
-        flash("Error: Faltan datos obligatorios o la cantidad es inválida.", "danger")
-        return redirect(url_for('vista_admin'))
+    if not producto_id or not tipo_op_id or cantidad <= 0:
+        flash("Datos de movimiento inválidos o cantidad menor/igual a cero.", "error")
+        return redirect(request.referrer or url_for('admin_almacenes'))
 
-    tipo_op = TipoOperacion.query.get(tipo_operacion_id)
-    if not tipo_op:
-        flash("Error: El tipo de operación seleccionado no es válido.", "danger")
-        return redirect(url_for('vista_admin'))
+    producto = Producto.query.get_or_404(producto_id)
+    tipo_op = TipoOperacion.query.get_or_404(tipo_op_id)
 
-    comportamiento = tipo_op.codigo.strip().lower() if tipo_op.codigo else ""
+    requiere_origen = bool(tipo_op.requiere_origen)
+    requiere_destino = bool(tipo_op.requiere_destino)
 
-    # 1. COMPORTAMIENTO: TRASLADO (Origen -> Destino)
-    if comportamiento.startswith('traslado'):
-        if not origen_id or not destino_id or origen_id == destino_id:
-            flash("Error: Origen y destino inválidos para el traslado.", "danger")
-            return redirect(url_for('vista_admin'))
-        
-        stock_origen = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=origen_id).first()
-        if not stock_origen or stock_origen.cantidad < cantidad:
-            flash("Error: Stock insuficiente en el almacén de origen.", "danger")
-            return redirect(url_for('vista_admin'))
-        
-        stock_origen.cantidad -= cantidad
-        stock_destino = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=destino_id).first()
-        if stock_destino:
-            stock_destino.cantidad += cantidad
-        else:
-            db.session.add(StockAlmacen(producto_id=producto_id, almacen_id=destino_id, cantidad=cantidad))
+    if requiere_origen and not origen_id:
+        flash("Debes seleccionar un almacén de origen para esta operación.", "error")
+        return redirect(request.referrer or url_for('admin_almacenes'))
 
-    # 2. COMPORTAMIENTO: ENTRADA (Solo Destino)
-    elif comportamiento.startswith('entrada'):
-        if not destino_id:
-            flash("Error: La entrada requiere un almacén de destino.", "danger")
-            return redirect(url_for('vista_admin'))
-        
-        stock_destino = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=destino_id).first()
-        if stock_destino:
-            stock_destino.cantidad += cantidad
-        else:
-            db.session.add(StockAlmacen(producto_id=producto_id, almacen_id=destino_id, cantidad=cantidad))
+    if requiere_destino and not destino_id:
+        flash("Debes seleccionar un almacén de destino para esta operación.", "error")
+        return redirect(request.referrer or url_for('admin_almacenes'))
 
-    # 3. COMPORTAMIENTO: SALIDA (Solo Origen)
-    elif comportamiento.startswith('salida'):
-        if not origen_id:
-            flash("Error: La salida requiere seleccionar un almacén de origen.", "danger")
-            return redirect(url_for('vista_admin'))
-        
-        stock_origen = StockAlmacen.query.filter_by(producto_id=producto_id, almacen_id=origen_id).first()
-        if not stock_origen or stock_origen.cantidad < cantidad:
-            flash(f"Error: Stock insuficiente en el almacén.", "danger")
-            return redirect(url_for('vista_admin'))
-        
-        stock_origen.cantidad -= cantidad
+    if requiere_origen and requiere_destino and origen_id == destino_id:
+        flash("El almacén de origen y destino no pueden ser el mismo.", "error")
+        return redirect(request.referrer or url_for('admin_almacenes'))
 
-        producto_afectado = Producto.query.get(producto_id)
-        concepto_obj = ConceptoMovimiento.query.get(concepto_id)
+    try:
+        stock_origen = None
+        if requiere_origen:
+            stock_origen = StockAlmacen.query.filter_by(
+                producto_id=producto_id,
+                almacen_id=origen_id
+            ).first()
+            disponible_origen = round(float(stock_origen.cantidad or 0.0), 2) if stock_origen else 0.0
+            if not stock_origen or disponible_origen < cantidad:
+                flash(
+                    f"Stock insuficiente en el almacén de origen (Disponible: {disponible_origen}).",
+                    "error"
+                )
+                return redirect(request.referrer or url_for('admin_almacenes'))
+            stock_origen.cantidad = round(disponible_origen - cantidad, 2)
 
-        # --- CASO A: DEVOLUCIÓN AL PROVEEDOR (ID 6) ---
-        if concepto_id == 6:
-            # Buscamos la cuenta por pagar pendiente de este producto
-            cuenta_pendiente = CuentaPorPagar.query.filter_by(
-                producto_id=producto_id
-            ).filter(CuentaPorPagar.monto_pendiente > 0).first()
-
-            if cuenta_pendiente:
-                # Calculamos el precio unitario original de esa deuda
-                precio_unitario = cuenta_pendiente.monto_pendiente / cuenta_pendiente.cantidad if cuenta_pendiente.cantidad > 0 else (producto_afectado.precio_costo or 0.0)
-                
-                unidades_a_descontar = min(cantidad, cuenta_pendiente.cantidad)
-                monto_a_restar = unidades_a_descontar * precio_unitario
-
-                cuenta_pendiente.cantidad -= unidades_a_descontar
-                cuenta_pendiente.monto_pendiente -= monto_a_restar
-
-                # Si se cubrió toda la deuda de este producto, se marca como pagado/saldado
-                if cuenta_pendiente.cantidad <= 0 or cuenta_pendiente.monto_pendiente <= 0:
-                    cuenta_pendiente.cantidad = 0
-                    cuenta_pendiente.monto_pendiente = 0.0
-                    cuenta_pendiente.estado = 'pagado'
-                
-                flash(f"Devolución aplicada: Se descontaron {unidades_a_descontar} unidades de la cuenta por pagar.", "success")
+        stock_destino = None
+        if requiere_destino:
+            stock_destino = StockAlmacen.query.filter_by(
+                producto_id=producto_id,
+                almacen_id=destino_id
+            ).first()
+            if stock_destino:
+                actual_destino = round(float(stock_destino.cantidad or 0.0), 2)
+                stock_destino.cantidad = round(actual_destino + cantidad, 2)
             else:
-                flash("Advertencia: Se descontó del inventario, pero este producto no tiene ninguna Cuenta por Pagar pendiente activa.", "warning")
+                stock_destino = StockAlmacen(
+                    producto_id=producto_id,
+                    almacen_id=destino_id,
+                    cantidad=cantidad
+                )
+                db.session.add(stock_destino)
 
-        # --- CASO B: MERMA (ID 3), VENTA INTERNA (ID 4) O CONSUMO INTERNO (ID 5) ---
-        elif concepto_id in [3, 4, 5]:
-            costo_unitario = producto_afectado.precio_costo or 0.0
-            total_perdida = cantidad * costo_unitario
+        usuario_actual = Usuario.query.filter_by(username=session.get('user')).first()
+        movimiento = MovimientoStock(
+            producto_id=producto_id,
+            tipo_operacion_id=tipo_op_id,
+            concepto_id=concepto_id if concepto_id else None,
+            almacen_origen_id=origen_id if requiere_origen else None,
+            almacen_destino_id=destino_id if requiere_destino else None,
+            cantidad=cantidad,
+            usuario_id=usuario_actual.id if usuario_actual else None
+        )
+        db.session.add(movimiento)
+        db.session.commit()
 
-            nueva_perdida = HistorialPerdida(
-                producto_id=producto_afectado.id,
-                producto_nombre=producto_afectado.nombre,
-                propietario_id=producto_afectado.propietario_id,
-                concepto=concepto_obj.nombre if concepto_obj else "Pérdida",
-                cantidad=cantidad,
-                precio_costo=costo_unitario,
-                monto_perdida=total_perdida
-            )
-            db.session.add(nueva_perdida)
+        flash("Movimiento de stock registrado correctamente.", "success")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error al registrar el movimiento: {str(e)}", "error")
 
-    else:
-        flash(f"Error: El código de comportamiento no está reconocido.", "danger")
-        return redirect(url_for('vista_admin'))
-
-    db.session.commit()
-    flash("¡Operación y ajustes contables procesados con éxito!", "success")
-    return redirect(url_for('vista_admin'))
+    return redirect(request.referrer or url_for('admin_almacenes'))
 
 from datetime import datetime
 
@@ -1492,7 +1458,7 @@ def procesar_cierre():
 
     efectivo_caja = float(data.get('efectivo_caja', 0.0))
     total_transferencias = float(data.get('total_transferencias', 0.0))
-    observaciones = data.get('observaciones', '').strip()  # <--- NUEVO: Capturar observaciones
+    observaciones = data.get('observaciones', '').strip()
     productos_cierre = data.get('productos', [])
     deudas_cierre = data.get('deudas', [])
 
@@ -1515,7 +1481,12 @@ def procesar_cierre():
             if prop_id == 2 or 'cristian' in prop_nombre:
                 tiene_cristian = True
 
-    total_deudas = sum(float(d.get('subtotal', 0.0)) for d in deudas_cierre)
+    deudas_directas = float(data.get('total_deudas', 0.0) or 0.0)
+    total_deudas = (
+        sum(float(d.get('subtotal', 0.0)) for d in deudas_cierre)
+        if deudas_cierre
+        else deudas_directas
+    )
 
     descuento_cristian = 1000.0 if tiene_cristian else 0.0
     comision_dayana = ventas_dayana * 0.03
@@ -1533,36 +1504,31 @@ def procesar_cierre():
             total_deudas=total_deudas,
             total_esperado=total_esperado,
             diferencia=diferencia,
-            observaciones=observaciones  # <--- NUEVO: Guardar observaciones en la base de datos
+            observaciones=observaciones
         )
         db.session.add(nuevo_cierre)
         db.session.flush()
 
-        # Guardar detalles de productos vendidos y actualizar stock del almacén
         for p_data in productos_cierre:
             p_id = int(p_data['id'])
-            entradas = float(p_data.get('entradas', 0.0))
-            stock_final = float(p_data.get('stock_final', 0.0))
-            vendidos = float(p_data.get('vendidos', 0.0))
-            subtotal = float(p_data.get('subtotal', 0.0))
+            entradas = round(float(p_data.get('entradas', 0.0)), 2)
+            stock_final = round(float(p_data.get('stock_final', 0.0)), 2)
+            vendidos = round(float(p_data.get('vendidos', 0.0)), 2)
+            subtotal = round(float(p_data.get('subtotal', 0.0)), 2)
 
             producto = Producto.query.get(p_id)
             if producto:
-                stock_inicial_calculado = stock_final + vendidos - entradas
+                stock_inicial_calculado = round(stock_final + vendidos - entradas, 2)
                 prop_nombre = producto.propietario.nombre if producto.propietario else "Sin Propietario"
                 
-                # --- AQUÍ SE CONGELAN LOS DATOS HISTÓRICOS ---
                 detalle = DetalleCierre(
                     cierre_id=nuevo_cierre.id,
                     producto_id=producto.id,
                     nombre_producto=producto.nombre,
                     propietario_nombre=prop_nombre,
-                    
-                    # Nuevos campos del snapshot:
-                    precio_costo=producto.precio_costo or 0.0,   # Congela el costo unitario de hoy
-                    propietario_id=producto.propietario_id,     # Congela ID del socio
-                    proveedor_id=producto.proveedor_id,         # Congela ID del proveedor
-                    
+                    precio_costo=producto.precio_costo or 0.0,
+                    propietario_id=producto.propietario_id,
+                    proveedor_id=producto.proveedor_id,
                     precio_venta=producto.precio_venta,
                     stock_inicial=stock_inicial_calculado,
                     entradas=entradas,
@@ -1572,7 +1538,6 @@ def procesar_cierre():
                 )
                 db.session.add(detalle)
 
-                # Actualizar inventario físico en el almacén del usuario
                 stock_almacen = StockAlmacen.query.filter_by(
                     producto_id=producto.id, 
                     almacen_id=almacen_usuario_id
@@ -1588,7 +1553,6 @@ def procesar_cierre():
                     )
                     db.session.add(nuevo_stock)
 
-        # Guardar deudas asociadas al cierre
         for d_data in deudas_cierre:
             deuda = DeudaCierre(
                 cierre_id=nuevo_cierre.id,
@@ -1698,28 +1662,51 @@ def vista_reporte_cierres():
 
   cierres = query.distinct().order_by(CierreDia.fecha.desc()).all()
 
-  # 3. Construcción del Resumen
+  # 3. Normalizar deudas del día y diferencia real para cada cierre (sin mutar la BD)
+  for c in cierres:
+    deudas_guardadas = float(c.total_deudas or 0.0)
+    if deudas_guardadas > 0:
+      deudas_dia_cierre = deudas_guardadas
+      esperado_efectivo = float(c.total_esperado or 0.0)
+      diferencia_real = float(c.efectivo_caja or 0.0) - esperado_efectivo
+    else:
+      fecha_cierre = c.fecha.date() if c.fecha else None
+      deudas_fecha = (
+          DeudaCierre.query.filter(
+              func.date(DeudaCierre.fecha) == fecha_cierre
+          ).all()
+          if fecha_cierre
+          else []
+      )
+      deudas_dia_cierre = sum(float(d.subtotal or 0.0) for d in deudas_fecha)
+      esperado_efectivo = float(c.total_esperado or 0.0) - deudas_dia_cierre
+      diferencia_real = float(c.efectivo_caja or 0.0) - esperado_efectivo
+
+    c.deudas_dia_vista = deudas_dia_cierre
+    c.esperado_efectivo_vista = esperado_efectivo
+    c.diferencia_real_vista = diferencia_real
+
+  # 4. Construcción del Resumen
   resumen = {
-      'total_esperado': 0,
-      'total_transferencias': 0,
-      'efectivo_caja': 0,
-      'total_deudas': 0,
-      'diferencia': 0,
-      'subtotal_filtrado': 0,
-      'costo_filtrado': 0,
-      'ganancia_filtrada': 0,
+      'total_esperado': 0.0,
+      'total_transferencias': 0.0,
+      'efectivo_caja': 0.0,
+      'total_deudas': 0.0,
+      'diferencia': 0.0,
+      'subtotal_filtrado': 0.0,
+      'costo_filtrado': 0.0,
+      'ganancia_filtrada': 0.0,
       'productos': {},
   }
 
   for c in cierres:
-    resumen['total_esperado'] += c.total_esperado
-    resumen['total_transferencias'] += c.total_transferencias
-    resumen['efectivo_caja'] += c.efectivo_caja
-    resumen['total_deudas'] += c.total_deudas
-    resumen['diferencia'] += c.diferencia
+    resumen['total_esperado'] += c.esperado_efectivo_vista
+    resumen['total_transferencias'] += float(c.total_transferencias or 0.0)
+    resumen['efectivo_caja'] += float(c.efectivo_caja or 0.0)
+    resumen['total_deudas'] += c.deudas_dia_vista
+    resumen['diferencia'] += c.diferencia_real_vista
 
     for d in c.detalles:
-      # Obtener ID de propietario y proveedor (de la foto congelada o fallback al producto)
       d_prop_id = getattr(d, 'propietario_id', None) or (
           d.producto.propietario_id if d.producto else None
       )
@@ -1732,7 +1719,6 @@ def vista_reporte_cierres():
       if proveedor_id and str(d_prov_id) != str(proveedor_id):
         continue
 
-      # Priorizar precio_costo congelado en el detalle 'd'
       precio_costo_unitario = (
           d.precio_costo
           if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0)
@@ -1827,91 +1813,120 @@ def vista_reporte_cierres():
 
 @app.route('/admin/cierres/<int:id_cierre>/detalle')
 def obtener_detalle_cierre(id_cierre):
-    """Devuelve los detalles de un cierre específico en formato JSON para el modal."""
-    if 'user' not in session or session.get('rol') != 'admin':
-        return jsonify({'success': False, 'message': 'No autorizado'}), 403
+  """Devuelve los detalles de un cierre específico en formato JSON para el modal."""
+  if 'user' not in session or session.get('rol') != 'admin':
+    return jsonify({'success': False, 'message': 'No autorizado'}), 403
 
-    cierre = CierreDia.query.get_or_404(id_cierre)
-    detalles = []
-    
-    ganancias_por_propietario = {}
-    ventas_brutas_por_propietario = {}
-    descuentos_por_propietario = {}
+  cierre = CierreDia.query.get_or_404(id_cierre)
+  detalles = []
 
-    for d in cierre.detalles:
-        producto = db.session.get(Producto, d.producto_id) if hasattr(db, 'session') else Producto.query.get(d.producto_id)
-        
-        # Leer primero el precio de costo congelado en el detalle
-        precio_costo = d.precio_costo if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0) else (producto.precio_costo if producto else 0.0)
-        
-        if hasattr(d, 'propietario_nombre') and d.propietario_nombre:
-            propietario_nombre = d.propietario_nombre
-        elif producto and producto.propietario:
-            propietario_nombre = producto.propietario.nombre
-        else:
-            propietario_nombre = "Sin Propietario"
+  ganancias_por_propietario = {}
+  ventas_brutas_por_propietario = {}
+  descuentos_por_propietario = {}
 
-        ganancia_item = d.vendidos * (d.precio_venta - precio_costo)
-        venta_bruta_item = d.subtotal
+  for d in cierre.detalles:
+    producto = (
+        db.session.get(Producto, d.producto_id)
+        if hasattr(db, 'session')
+        else Producto.query.get(d.producto_id)
+    )
 
-        if propietario_nombre not in ganancias_por_propietario:
-            ganancias_por_propietario[propietario_nombre] = 0.0
-            descuentos_por_propietario[propietario_nombre] = {"tipo": None, "monto": 0.0}
-            
-        ganancias_por_propietario[propietario_nombre] += ganancia_item
+    precio_costo = (
+        d.precio_costo
+        if (hasattr(d, 'precio_costo') and d.precio_costo and d.precio_costo > 0)
+        else (producto.precio_costo if producto else 0.0)
+    )
 
-        if propietario_nombre not in ventas_brutas_por_propietario:
-            ventas_brutas_por_propietario[propietario_nombre] = 0.0
-        ventas_brutas_por_propietario[propietario_nombre] += venta_bruta_item
+    if hasattr(d, 'propietario_nombre') and d.propietario_nombre:
+      propietario_nombre = d.propietario_nombre
+    elif producto and producto.propietario:
+      propietario_nombre = producto.propietario.nombre
+    else:
+      propietario_nombre = 'Sin Propietario'
 
-        detalles.append({
-            'nombre_producto': d.nombre_producto,
-            'precio_venta': d.precio_venta,
-            'stock_inicial': d.stock_inicial,
-            'entradas': d.entradas,
-            'stock_final': d.stock_final,
-            'vendidos': d.vendidos,
-            'subtotal': d.subtotal
-        })
+    ganancia_item = d.vendidos * (d.precio_venta - precio_costo)
+    venta_bruta_item = d.subtotal
 
-    # APLICAR DESCUENTOS ESPECÍFICOS Y REGISTRARLOS
-    for propietario_nombre in ganancias_por_propietario:
-        nombre_lower = propietario_nombre.strip().lower()
-        
-        if "cristian" in nombre_lower:
-            descuento = 1000.0
-            ganancias_por_propietario[propietario_nombre] -= descuento
-            descuentos_por_propietario[propietario_nombre] = {
-                "label": "Salario", 
-                "monto": descuento
-            }
-            
-        elif "dayana" in nombre_lower:
-            venta_dayana = ventas_brutas_por_propietario.get(propietario_nombre, 0.0)
-            descuento = venta_dayana * 0.03
-            ganancias_por_propietario[propietario_nombre] -= descuento
-            descuentos_por_propietario[propietario_nombre] = {
-                "label": "Comisión 3%", 
-                "monto": descuento
-            }
+    if propietario_nombre not in ganancias_por_propietario:
+      ganancias_por_propietario[propietario_nombre] = 0.0
+      descuentos_por_propietario[propietario_nombre] = {
+          'tipo': None,
+          'monto': 0.0,
+      }
 
-    return jsonify({
-        'success': True,
-        'cierre': {
-            'id': cierre.id,
-            'fecha': cierre.fecha.strftime('%d/%m/%Y %I:%M %p'),
-            'usuario_nombre': cierre.usuario_nombre,
-            'total_esperado': cierre.total_esperado,
-            'total_transferencias': cierre.total_transferencias or 0.0,
-            'efectivo_caja': cierre.efectivo_caja,
-            'diferencia': cierre.diferencia,
-            'observaciones': cierre.observaciones or ''  # <--- NUEVO: Enviar observaciones en el JSON
-        },
-        'detalles': detalles,
-        'ganancias_propietarios': ganancias_por_propietario,
-        'ventas_brutas_propietarios': ventas_brutas_por_propietario,
-        'descuentos_propietarios': descuentos_por_propietario
+    ganancias_por_propietario[propietario_nombre] += ganancia_item
+
+    if propietario_nombre not in ventas_brutas_por_propietario:
+      ventas_brutas_por_propietario[propietario_nombre] = 0.0
+    ventas_brutas_por_propietario[propietario_nombre] += venta_bruta_item
+
+    detalles.append({
+        'nombre_producto': d.nombre_producto,
+        'precio_venta': d.precio_venta,
+        'stock_inicial': d.stock_inicial,
+        'entradas': d.entradas,
+        'stock_final': d.stock_final,
+        'vendidos': d.vendidos,
+        'subtotal': d.subtotal,
     })
+
+  for propietario_nombre in ganancias_por_propietario:
+    nombre_lower = propietario_nombre.strip().lower()
+
+    if 'cristian' in nombre_lower:
+      descuento = 1000.0
+      ganancias_por_propietario[propietario_nombre] -= descuento
+      descuentos_por_propietario[propietario_nombre] = {
+          'label': 'Salario',
+          'monto': descuento,
+      }
+
+    elif 'dayana' in nombre_lower:
+      venta_dayana = ventas_brutas_por_propietario.get(propietario_nombre, 0.0)
+      descuento = venta_dayana * 0.03
+      ganancias_por_propietario[propietario_nombre] -= descuento
+      descuentos_por_propietario[propietario_nombre] = {
+          'label': 'Comisión 3%',
+          'monto': descuento,
+      }
+
+  deudas_guardadas = float(cierre.total_deudas or 0.0)
+  if deudas_guardadas > 0:
+    deudas_dia = deudas_guardadas
+    esperado_efectivo = float(cierre.total_esperado or 0.0)
+    diferencia_real = float(cierre.efectivo_caja or 0.0) - esperado_efectivo
+  else:
+    fecha_cierre = cierre.fecha.date() if cierre.fecha else None
+    deudas_fecha = (
+        DeudaCierre.query.filter(
+            func.date(DeudaCierre.fecha) == fecha_cierre
+        ).all()
+        if fecha_cierre
+        else []
+    )
+    deudas_dia = sum(float(d.subtotal or 0.0) for d in deudas_fecha)
+    esperado_efectivo = float(cierre.total_esperado or 0.0) - deudas_dia
+    diferencia_real = float(cierre.efectivo_caja or 0.0) - esperado_efectivo
+
+  return jsonify({
+      'success': True,
+      'cierre': {
+          'id': cierre.id,
+          'fecha': cierre.fecha.strftime('%d/%m/%Y %I:%M %p'),
+          'usuario_nombre': cierre.usuario_nombre,
+          'total_esperado': esperado_efectivo,
+          'total_transferencias': float(cierre.total_transferencias or 0.0),
+          'total_deudas': deudas_dia,
+          'efectivo_caja': float(cierre.efectivo_caja or 0.0),
+          'diferencia': diferencia_real,
+          'observaciones': cierre.observaciones or '',
+      },
+      'detalles': detalles,
+      'ganancias_propietarios': ganancias_por_propietario,
+      'ventas_brutas_propietarios': ventas_brutas_por_propietario,
+      'descuentos_propietarios': descuentos_por_propietario,
+  })
+
 # -----------------------------------------------------------------#
 # CUENTAS POR PAGAR
 # -----------------------------------------------------------------#

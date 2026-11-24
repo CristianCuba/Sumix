@@ -53,7 +53,7 @@ Cada vez que modifiques algo en tu código local y quieras que se refleje en la 
     Bash
 
     git add .
-    git commit -m "ajustes completos en efectivo estimado y ganancias en filtro"
+    git commit -m "vista responsive de admin cierres"
     git push origin master
 
     Descarga los cambios en PythonAnywhere:
@@ -68,7 +68,7 @@ Cada vez que modifiques algo en tu código local y quieras que se refleje en la 
         Trae la última versión desde GitHub:
         Bash
 
-        it checkout -- instance/sumix.db
+        git checkout -- instance/sumix.db
         git pull origin master
 
     Reinicia la aplicación web:
