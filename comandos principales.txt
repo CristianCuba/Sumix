@@ -53,7 +53,7 @@ Cada vez que modifiques algo en tu código local y quieras que se refleje en la 
     Bash
 
     git add .
-    git commit -m "vista responsive de admin cierres"
+    git commit -m "arreglado la vista cierres y los decimales"
     git push origin master
 
     Descarga los cambios en PythonAnywhere:
